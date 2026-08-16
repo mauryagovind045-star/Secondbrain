@@ -180,6 +180,36 @@
     min-height:22px; transition:opacity .8s ease;
   }
 
+  /* ---------- the year (annual goal) ---------- */
+  .yg-title{
+    font-family:var(--heads); font-weight:600; font-size:27px;
+    letter-spacing:.12em; text-transform:uppercase; line-height:1.1;
+  }
+  .yg-title em{ font-style:normal; color:var(--red); }
+  .yg-sub{
+    font-family:var(--mono); font-size:9.5px; color:var(--faint);
+    letter-spacing:.16em; text-transform:uppercase; margin-top:7px;
+  }
+  .yg-bar{
+    height:6px; background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-radius:2px; margin-top:14px; overflow:hidden;
+  }
+  .yg-bar i{
+    display:block; height:100%;
+    background:linear-gradient(90deg,var(--red-dim),var(--red));
+    transition:width .3s ease;
+  }
+  .yg-row{
+    display:flex; align-items:center; gap:10px; margin-top:12px;
+  }
+  .yg-row .banked{
+    font-family:var(--mono); font-size:10.5px; color:var(--muted);
+    letter-spacing:.08em; white-space:nowrap;
+  }
+  .yg-row .banked b{ color:var(--text); font-weight:500; }
+  .yg-row input{ max-width:190px; margin-left:auto; }
+  .yg-row button{ font-size:10px; padding:8px 13px; }
+
   /* ---------- stats strip ---------- */
   .stats{
     display:grid; grid-template-columns:repeat(4,1fr); gap:20px;
@@ -347,41 +377,47 @@
   }
 
   /* ---------- the vows (21-day trackers) ---------- */
-  .vow-row{ padding:15px 0 17px; border-bottom:1px solid var(--line-soft); }
-  .vow-row:first-child{ padding-top:4px; }
-  .vow-row:last-child{ padding-bottom:4px; border-bottom:none; }
+  .vow-card{ padding:16px 0 20px; border-bottom:1px solid var(--line-soft); }
+  .vow-card:first-child{ padding-top:4px; }
+  .vow-card:last-child{ padding-bottom:4px; border-bottom:none; }
   .vow-head{ display:flex; align-items:baseline; gap:12px; }
   .vow-name{
-    font-family:var(--heads); font-weight:500; font-size:14.5px;
+    font-family:var(--heads); font-weight:500; font-size:15px;
     letter-spacing:.22em; text-transform:uppercase;
   }
   .vow-count{
-    font-family:var(--mono); font-size:10.5px; color:var(--muted);
-    letter-spacing:.08em; margin-left:auto;
+    font-family:var(--heads); font-weight:500; font-size:13px;
+    letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); margin-left:auto;
   }
-  .vow-count b{ color:var(--text); font-weight:500; }
+  .vow-count b{ color:var(--red); font-weight:600; font-size:17px; }
   .vow-count.kept{ color:var(--gold); }
-  .vow-track{ display:flex; gap:3px; margin-top:11px; }
-  .vseg{
-    flex:1; height:5px; border-radius:1px;
-    background:var(--bg-deep); border:1px solid var(--line-soft);
+  .vow-count.kept b{ color:var(--gold); }
+  .vow-info{
+    font-family:var(--mono); font-size:9.5px; color:var(--faint);
+    letter-spacing:.14em; text-transform:uppercase; margin-top:6px;
   }
-  .vseg.done{ background:var(--red-dim); border-color:var(--red-dim); }
-  .vseg.now{ border-color:var(--gold); }
-  .vow-meta{
-    display:flex; align-items:center; gap:16px; margin-top:10px;
+  .vow-cells{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:12px;
+  }
+  .vc{
+    height:30px; border-radius:2px;
+    border:1px solid var(--line); background:var(--bg-deep);
+    display:grid; place-items:center;
+    font-family:var(--mono); font-size:10.5px; color:var(--faint);
+  }
+  .vc.done{ background:var(--red-dim); border-color:var(--red-dim); color:#fff; }
+  .vc.today{ border-color:var(--gold); color:var(--gold); font-weight:500; }
+  @keyframes vow-pulse{ 50%{ box-shadow:0 0 10px rgba(200,162,75,.3); } }
+  .vc.today{ animation:vow-pulse 2.4s ease-in-out infinite; }
+  .vow-foot{ display:flex; align-items:center; gap:16px; margin-top:12px; }
+  .vow-foot .vstat{
     font-family:var(--mono); font-size:9.5px; color:var(--faint); letter-spacing:.12em;
   }
-  .vow-meta b{ color:var(--muted); font-weight:500; }
-  .vow-meta .vact{
-    margin-left:auto; background:none; border:none; padding:2px 0;
-    font-family:var(--mono); font-size:9.5px; letter-spacing:.15em;
-    color:var(--faint); cursor:pointer;
-  }
-  .vow-meta .vact:hover{ color:var(--text); }
-  .vow-meta .vact.begin{ color:var(--red); }
-  .vow-meta .vact.begin:hover{ color:#e8686c; }
-  .vow-meta .vact.danger-armed{ color:var(--red); }
+  .vow-foot .vstat b{ color:var(--muted); font-weight:500; }
+  .vow-foot .vbtn{ margin-left:auto; font-size:10px; padding:7px 13px; }
+  .vow-foot .vbtn.danger-armed{ border-color:var(--red); color:var(--red); }
+  @media (prefers-reduced-motion: reduce){ .vc.today{ animation:none; } }
 
   .empty{
     font-family:var(--mono); font-size:10.5px; color:var(--faint);
@@ -492,6 +528,14 @@
         <div class="second" id="second-quote"></div>
       </section>
 
+      <section class="panel">
+        <div class="panel-head">
+          <h2>The Year</h2><span class="tag">2026 · the one number that matters</span>
+          <span class="count" id="year-days"></span>
+        </div>
+        <div class="panel-body" id="year-body"></div>
+      </section>
+
       <div class="stats">
         <div class="stat"><div class="n" id="stat-open">0</div><div class="l">Open missions</div></div>
         <div class="stat"><div class="n" id="stat-done">0</div><div class="l">Cleared today</div></div>
@@ -588,12 +632,13 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS() };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 } };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
   } catch (e) { /* corrupted store — start fresh */ }
   if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
+  if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
     delete db.vow;
@@ -831,51 +876,67 @@
   $('goal-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGoal(); });
 
   /* ---------- the vows (21-day trackers) ---------- */
+  const shortDate = iso => new Date(iso + 'T00:00:00')
+    .toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   function renderVow() {
     const box = $('vow-body');
     box.innerHTML = '';
     db.vows.forEach(v => {
-      const row = document.createElement('div');
-      row.className = 'vow-row';
+      const card = document.createElement('div');
+      card.className = 'vow-card';
 
       if (!v.start) {
-        row.innerHTML =
+        let cells = '';
+        for (let i = 1; i <= 21; i++) cells += '<div class="vc">' + i + '</div>';
+        card.innerHTML =
           '<div class="vow-head"><span class="vow-name">' + v.name + '</span>' +
           '<span class="vow-count">not started</span></div>' +
-          '<div class="vow-track">' + '<span class="vseg"></span>'.repeat(21) + '</div>' +
-          '<div class="vow-meta">' +
-            '<span>BEST <b>' + v.best + 'd</b></span><span>FALLS <b>' + v.falls + '</b></span>' +
-            '<button class="vact begin">BEGIN</button>' +
+          '<div class="vow-info">Press start — every clean day after that is counted for you.</div>' +
+          '<div class="vow-cells">' + cells + '</div>' +
+          '<div class="vow-foot">' +
+            '<span class="vstat">BEST <b>' + v.best + 'd</b></span>' +
+            '<span class="vstat">RELAPSES <b>' + v.falls + '</b></span>' +
+            '<button class="vbtn primary start">Start day 1</button>' +
           '</div>';
-        row.querySelector('.begin').onclick = () => { v.start = todayKey(); save(); renderVow(); };
-        box.appendChild(row);
+        card.querySelector('.start').onclick = () => { v.start = todayKey(); save(); renderVow(); };
+        box.appendChild(card);
         return;
       }
 
-      const days = daysSince(v.start);
+      const days = daysSince(v.start);      // full days survived
+      const dayNum = Math.min(days + 1, 21); // the day you are on now
       const kept = days >= 21;
-      let segs = '';
+
+      let cells = '';
       for (let i = 1; i <= 21; i++) {
-        segs += '<span class="vseg' + (i <= days ? ' done' : (i === days + 1 ? ' now' : '')) + '"></span>';
+        if (i <= days)            cells += '<div class="vc done">✓</div>';
+        else if (i === days + 1)  cells += '<div class="vc today">' + i + '</div>';
+        else                      cells += '<div class="vc">' + i + '</div>';
       }
-      row.innerHTML =
+
+      card.innerHTML =
         '<div class="vow-head"><span class="vow-name">' + v.name + '</span>' +
         '<span class="vow-count' + (kept ? ' kept' : '') + '">' +
-          (kept ? 'KEPT — DAY ' + days : 'DAY <b>' + (days + 1) + '</b> / 21') +
+          (kept ? 'Kept · day <b>' + (days + 1) + '</b>' : 'Day <b>' + dayNum + '</b> of 21') +
         '</span></div>' +
-        '<div class="vow-track">' + segs + '</div>' +
-        '<div class="vow-meta">' +
-          '<span>BEST <b>' + Math.max(v.best, days) + 'd</b></span>' +
-          '<span>FALLS <b>' + v.falls + '</b></span>' +
-          (kept ? '<button class="vact renew">RENEW</button>' : '') +
-          '<button class="vact fall"' + (kept ? ' style="margin-left:16px"' : '') + '>I FELL</button>' +
+        '<div class="vow-info">' +
+          (kept
+            ? '21 days complete — still counting since ' + shortDate(v.start) + '.'
+            : 'Started ' + shortDate(v.start) + ' · ' + (21 - days) + ' days to go · ✓ = day survived, gold = today. Counts by itself — touch nothing unless you relapse.') +
+        '</div>' +
+        '<div class="vow-cells">' + cells + '</div>' +
+        '<div class="vow-foot">' +
+          '<span class="vstat">BEST <b>' + Math.max(v.best, days) + 'd</b></span>' +
+          '<span class="vstat">RELAPSES <b>' + v.falls + '</b></span>' +
+          (kept ? '<button class="vbtn renew" style="margin-left:auto">Renew · 21 more</button>' : '') +
+          '<button class="vbtn fall"' + (kept ? '' : ' style="margin-left:auto"') + '>Relapsed · restart</button>' +
         '</div>';
 
-      const renew = row.querySelector('.renew');
+      const renew = card.querySelector('.renew');
       if (renew) renew.onclick = () => {
         v.best = Math.max(v.best, days); v.start = todayKey(); save(); renderVow();
       };
-      const fall = row.querySelector('.fall');
+      const fall = card.querySelector('.fall');
       fall.onclick = () => {
         if (fall.dataset.armed) {
           v.best = Math.max(v.best, days); v.falls++; v.start = todayKey();
@@ -883,16 +944,42 @@
         } else {
           fall.dataset.armed = '1';
           fall.classList.add('danger-armed');
-          fall.textContent = 'CONFIRM RESET?';
+          fall.textContent = 'Tap again to confirm';
           setTimeout(() => {
             delete fall.dataset.armed;
             fall.classList.remove('danger-armed');
-            fall.textContent = 'I FELL';
+            fall.textContent = 'Relapsed · restart';
           }, 4000);
         }
       };
-      box.appendChild(row);
+      box.appendChild(card);
     });
+  }
+
+  /* ---------- the year (annual goal) ---------- */
+  function renderYear() {
+    const y = db.year;
+    const now = new Date();
+    const end = new Date(now.getFullYear(), 11, 31);
+    const daysLeft = Math.max(0, Math.ceil((end - now) / 864e5));
+    const pct = Math.min(100, (y.earned / y.target) * 100);
+    const fmt = n => '₹' + n.toLocaleString('en-IN');
+
+    $('year-days').textContent = daysLeft + ' days left';
+    $('year-body').innerHTML =
+      '<div class="yg-title">Earn <em>' + fmt(y.target) + '</em></div>' +
+      '<div class="yg-sub">Fifty lakh by 31 December — everything above funds this.</div>' +
+      '<div class="yg-bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="yg-row">' +
+        '<span class="banked"><b>' + fmt(y.earned) + '</b> banked · ' + pct.toFixed(1) + '%</span>' +
+        '<input id="year-earned" type="number" min="0" placeholder="Total earned so far (₹)">' +
+        '<button id="year-set">Set</button>' +
+      '</div>';
+    $('year-set').onclick = () => {
+      const n = parseInt($('year-earned').value, 10);
+      if (!isNaN(n) && n >= 0) { y.earned = n; save(); renderYear(); }
+    };
+    $('year-earned').addEventListener('keydown', e => { if (e.key === 'Enter') $('year-set').click(); });
   }
 
   /* ---------- export / import ---------- */
@@ -911,8 +998,9 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS() }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 } }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
+        if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         save(); renderAll();
       } catch (err) { alert('That file is not a valid Sanctum backup.'); }
     };
@@ -921,7 +1009,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderVow(); renderStats();
+    renderTasks(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderStats();
   }
   renderAll();
 })();
