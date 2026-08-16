@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Sanctum — Personal CRM</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Saira+Condensed:wght@400;500;600;700&family=Saira:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:        #141619;
+    --bg-deep:   #0f1113;
+    --panel:     #1b1e23;
+    --panel-2:   #21252b;
+    --line:      #2c313a;
+    --line-soft: #23272e;
+    --text:      #d8dade;
+    --muted:     #878d97;
+    --faint:     #5a6069;
+    --red:       #d4353b;
+    --red-dim:   #8f2529;
+    --gold:      #c8a24b;
+    --ok:        #4f8f5f;
+    --radius:    10px;
+    --display:   'Rozha One', serif;
+    --heads:     'Saira Condensed', sans-serif;
+    --body:      'Saira', sans-serif;
+    --mono:      'IBM Plex Mono', monospace;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--body);
+    font-weight:300;
+    min-height:100vh;
+    background-image:
+      radial-gradient(ellipse 70% 45% at 50% 0%, rgba(212,53,59,.045), transparent 60%),
+      radial-gradient(ellipse 90% 60% at 50% 110%, rgba(0,0,0,.5), transparent 60%);
+  }
+  ::selection{ background:var(--red-dim); color:#fff; }
+
+  /* ---------- header ---------- */
+  header{
+    display:flex; align-items:center; gap:18px;
+    padding:14px 28px;
+    border-bottom:1px solid var(--line-soft);
+    background:rgba(15,17,19,.7);
+    backdrop-filter:blur(6px);
+    position:sticky; top:0; z-index:50;
+  }
+  .sigil{
+    width:34px; height:34px; flex:none;
+    display:grid; place-items:center;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  }
+  .sigil svg{ width:20px; height:20px; fill:var(--red); }
+  .brand{ display:flex; flex-direction:column; line-height:1; }
+  .brand b{
+    font-family:var(--heads); font-weight:600; font-size:19px;
+    letter-spacing:.28em; text-transform:uppercase;
+  }
+  .brand span{
+    font-family:var(--mono); font-size:9.5px; color:var(--faint);
+    letter-spacing:.18em; text-transform:uppercase; margin-top:4px;
+  }
+  .head-spacer{ flex:1; }
+  .clock{
+    font-family:var(--mono); font-size:12px; color:var(--muted);
+    text-align:right; line-height:1.5; letter-spacing:.06em;
+  }
+  .clock b{ color:var(--text); font-weight:500; }
+  .watch{
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.2em;
+    text-transform:uppercase; padding:5px 10px;
+    border:1px solid var(--line); border-radius:99px; color:var(--muted);
+    display:flex; align-items:center; gap:7px; white-space:nowrap;
+  }
+  .watch i{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--gold); display:inline-block;
+    box-shadow:0 0 8px var(--gold);
+  }
+  .watch.night i{ background:var(--red); box-shadow:0 0 8px var(--red); }
+
+  /* ---------- layout ---------- */
+  .wrap{
+    max-width:1460px; margin:0 auto;
+    padding:26px 28px 80px;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:minmax(300px,360px) minmax(420px,1fr) minmax(300px,360px);
+    gap:20px;
+    align-items:start;
+  }
+  .col{ display:flex; flex-direction:column; gap:20px; min-width:0; }
+
+  /* ---------- panels ---------- */
+  .panel{
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid var(--line-soft);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .panel-head{
+    display:flex; align-items:baseline; gap:10px;
+    padding:13px 16px 11px;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .panel-head h2{
+    font-family:var(--heads); font-weight:600; font-size:15px;
+    letter-spacing:.24em; text-transform:uppercase;
+  }
+  .panel-head .tag{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    letter-spacing:.14em; text-transform:uppercase;
+  }
+  .panel-head .count{
+    margin-left:auto; font-family:var(--mono); font-size:11px;
+    color:var(--red); letter-spacing:.05em;
+  }
+  .panel-body{ padding:14px 16px 16px; }
+
+  /* ---------- quote hero (the oath) ---------- */
+  .oath{
+    position:relative;
+    background:
+      radial-gradient(ellipse 60% 55% at 50% 42%, rgba(212,53,59,.07), transparent 70%),
+      linear-gradient(180deg,#191c20,#121417);
+    border:1px solid var(--line-soft);
+    border-radius:var(--radius);
+    padding:54px 30px 46px;
+    text-align:center;
+    overflow:hidden;
+    isolation:isolate;
+  }
+  .oath::before, .oath::after{
+    content:""; position:absolute; left:0; right:0; height:3px;
+    background:linear-gradient(90deg, transparent, var(--red) 18%, var(--red) 82%, transparent);
+  }
+  .oath::before{ top:0; }
+  .oath::after{ bottom:0; }
+  .oath .bat{
+    position:absolute; inset:0; margin:auto;
+    width:min(78%,460px); height:auto;
+    opacity:.05; z-index:-1; fill:#fff;
+    transform:translateY(-6%);
+  }
+  .oath .hindi{
+    font-family:var(--display);
+    font-size:clamp(38px, 4.6vw, 62px);
+    color:#e8e9ec;
+    line-height:1.25;
+    text-shadow:0 0 34px rgba(212,53,59,.35);
+  }
+  .oath .roman{
+    font-family:var(--heads); font-weight:700;
+    font-size:clamp(15px, 1.6vw, 21px);
+    letter-spacing:.42em; text-transform:uppercase;
+    color:var(--red); margin-top:16px; text-indent:.42em;
+  }
+  .oath .meaning{
+    font-family:var(--mono); font-size:11px; color:var(--muted);
+    letter-spacing:.22em; text-transform:uppercase; margin-top:12px;
+  }
+  .oath .rule{
+    width:54px; height:1px; background:var(--line);
+    margin:26px auto 0;
+  }
+  .oath .second{
+    margin-top:18px;
+    font-family:var(--body); font-weight:300; font-style:italic;
+    font-size:14px; color:var(--faint); letter-spacing:.03em;
+    min-height:22px; transition:opacity .8s ease;
+  }
+
+  /* ---------- stats strip ---------- */
+  .stats{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:20px;
+  }
+  .stat{
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid var(--line-soft); border-radius:var(--radius);
+    padding:14px 16px 12px;
+  }
+  .stat .n{
+    font-family:var(--heads); font-weight:600; font-size:30px; line-height:1;
+  }
+  .stat .n em{ font-style:normal; color:var(--red); }
+  .stat .l{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    letter-spacing:.18em; text-transform:uppercase; margin-top:7px;
+  }
+
+  /* ---------- inputs ---------- */
+  input, textarea, select{
+    background:var(--bg-deep);
+    border:1px solid var(--line);
+    border-radius:7px;
+    color:var(--text);
+    font-family:var(--body); font-weight:300; font-size:13.5px;
+    padding:9px 11px;
+    width:100%;
+    outline:none;
+    transition:border-color .15s;
+  }
+  input::placeholder, textarea::placeholder{ color:var(--faint); }
+  input:focus, textarea:focus, select:focus{ border-color:var(--red-dim); }
+  textarea{ resize:vertical; min-height:60px; }
+  select{ width:auto; cursor:pointer; font-family:var(--mono); font-size:11px; }
+  button{
+    font-family:var(--heads); font-weight:600; font-size:12.5px;
+    letter-spacing:.16em; text-transform:uppercase;
+    background:var(--panel-2); color:var(--text);
+    border:1px solid var(--line); border-radius:7px;
+    padding:9px 15px; cursor:pointer;
+    transition:all .15s;
+    white-space:nowrap;
+  }
+  button:hover{ border-color:var(--red-dim); color:#fff; }
+  button.primary{ background:var(--red-dim); border-color:var(--red-dim); color:#fff; }
+  button.primary:hover{ background:var(--red); border-color:var(--red); }
+  button.ghost{
+    background:none; border:none; padding:4px 6px;
+    color:var(--faint); font-size:13px; letter-spacing:0;
+  }
+  button.ghost:hover{ color:var(--red); }
+  button:focus-visible, input:focus-visible{ outline:2px solid var(--red-dim); outline-offset:1px; }
+  .row{ display:flex; gap:8px; }
+  .row + .row{ margin-top:8px; }
+
+  /* ---------- missions (tasks) ---------- */
+  .filters{ display:flex; gap:6px; margin-bottom:12px; }
+  .filters button{
+    font-size:10px; padding:5px 11px; letter-spacing:.14em;
+    border-radius:99px; color:var(--muted);
+  }
+  .filters button.active{ border-color:var(--red); color:#fff; background:rgba(212,53,59,.1); }
+  ul.list{ list-style:none; display:flex; flex-direction:column; gap:6px; }
+  .task{
+    display:flex; align-items:center; gap:10px;
+    background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-radius:7px; padding:9px 11px;
+  }
+  .task .check{
+    width:17px; height:17px; flex:none; cursor:pointer;
+    border:1.5px solid var(--faint); border-radius:5px;
+    display:grid; place-items:center; transition:all .15s;
+    background:none; padding:0;
+  }
+  .task .check svg{ width:10px; height:10px; fill:none; stroke:#fff; stroke-width:3; opacity:0; }
+  .task.done .check{ background:var(--red-dim); border-color:var(--red-dim); }
+  .task.done .check svg{ opacity:1; }
+  .task .txt{ flex:1; font-size:13.5px; min-width:0; overflow-wrap:break-word; }
+  .task.done .txt{ color:var(--faint); text-decoration:line-through; }
+  .chip{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.12em;
+    text-transform:uppercase; padding:3px 7px; border-radius:99px;
+    border:1px solid var(--line); color:var(--muted); flex:none;
+  }
+  .chip.work{ color:var(--gold); border-color:rgba(200,162,75,.35); }
+  .chip.life{ color:#7da2c1; border-color:rgba(125,162,193,.35); }
+
+  /* ---------- people ---------- */
+  .person{
+    background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-radius:7px; padding:11px 12px;
+  }
+  .person .top{ display:flex; align-items:center; gap:10px; }
+  .avatar{
+    width:32px; height:32px; flex:none; border-radius:8px;
+    display:grid; place-items:center;
+    font-family:var(--heads); font-weight:600; font-size:14px;
+    background:var(--panel-2); border:1px solid var(--line);
+    color:var(--red);
+  }
+  .person .who{ flex:1; min-width:0; }
+  .person .who b{ font-weight:500; font-size:14px; display:block; }
+  .person .who small{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    letter-spacing:.1em; text-transform:uppercase;
+  }
+  .person .touch{
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.05em;
+    color:var(--muted); text-align:right; line-height:1.5;
+  }
+  .person .touch.cold{ color:var(--red); }
+  .person .pnote{ font-size:12.5px; color:var(--muted); margin-top:8px; }
+  .person .actions{ display:flex; gap:4px; margin-top:8px; justify-content:flex-end; }
+
+  /* ---------- vault (notes) ---------- */
+  .note{
+    background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-left:2px solid var(--red-dim);
+    border-radius:7px; padding:11px 13px;
+  }
+  .note b{ font-weight:500; font-size:13.5px; display:block; }
+  .note p{ font-size:12.5px; color:var(--muted); margin-top:5px; white-space:pre-wrap; overflow-wrap:break-word; }
+  .note .meta{
+    display:flex; align-items:center; margin-top:8px;
+    font-family:var(--mono); font-size:9px; color:var(--faint); letter-spacing:.1em;
+  }
+  .note .meta button{ margin-left:auto; }
+
+  /* ---------- protocol (habits) ---------- */
+  .habit{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 0; border-bottom:1px solid var(--line-soft);
+  }
+  .habit:last-child{ border-bottom:none; }
+  .habit .hname{ flex:1; font-size:13.5px; min-width:0; }
+  .habit .days{ display:flex; gap:5px; }
+  .day{
+    width:20px; height:20px; border-radius:6px; cursor:pointer;
+    border:1px solid var(--line); background:var(--bg-deep);
+    display:grid; place-items:center; padding:0;
+    font-family:var(--mono); font-size:7.5px; color:var(--faint);
+    transition:all .15s;
+  }
+  .day.hit{ background:var(--red-dim); border-color:var(--red); color:#fff; }
+  .day.today{ border-color:var(--gold); }
+  .habit .streak{
+    font-family:var(--mono); font-size:10px; color:var(--gold);
+    min-width:34px; text-align:right;
+  }
+
+  /* ---------- objectives (goals) ---------- */
+  .goal{ padding:9px 0; border-bottom:1px solid var(--line-soft); }
+  .goal:last-child{ border-bottom:none; }
+  .goal .gtop{ display:flex; align-items:center; gap:8px; }
+  .goal .gname{ flex:1; font-size:13.5px; }
+  .goal .gpct{ font-family:var(--mono); font-size:10.5px; color:var(--red); }
+  .bar{
+    height:4px; background:var(--bg-deep); border-radius:99px;
+    margin-top:8px; overflow:hidden; cursor:pointer; position:relative;
+  }
+  .bar i{
+    display:block; height:100%; border-radius:99px;
+    background:linear-gradient(90deg,var(--red-dim),var(--red));
+    transition:width .25s ease;
+  }
+
+  .empty{
+    font-family:var(--mono); font-size:10.5px; color:var(--faint);
+    letter-spacing:.12em; text-transform:uppercase;
+    text-align:center; padding:18px 0 10px;
+  }
+
+  /* ---------- footer ---------- */
+  footer{
+    margin-top:34px; text-align:center;
+    font-family:var(--mono); font-size:9.5px; color:var(--faint);
+    letter-spacing:.2em; text-transform:uppercase;
+    display:flex; flex-direction:column; gap:10px; align-items:center;
+  }
+  footer .io{ display:flex; gap:8px; }
+  footer .io button{ font-size:10px; padding:6px 12px; color:var(--muted); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:1120px){
+    .grid{ grid-template-columns:1fr 1fr; }
+    .col.center{ grid-column:1 / -1; order:-1; }
+    .stats{ grid-template-columns:repeat(4,1fr); }
+  }
+  @media (max-width:720px){
+    .grid{ grid-template-columns:1fr; }
+    .stats{ grid-template-columns:repeat(2,1fr); }
+    header{ padding:12px 16px; flex-wrap:wrap; }
+    .wrap{ padding:18px 14px 60px; }
+    .clock{ display:none; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+    html{ scroll-behavior:auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="sigil" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path d="M12 3c.5 1.8.3 3-.4 4 1.6-.6 3.2-.5 4.4.2-2 .3-2.9 1.3-3.2 2.6h3.4c2.7 0 5.3-.9 6.8-2.3-1 3.9-4.6 6.9-9.2 7.3.7.8 1.1 1.9 1.2 3.2-1-.9-2-1.4-3-1.4s-2 .5-3 1.4c.1-1.3.5-2.4 1.2-3.2-4.6-.4-8.2-3.4-9.2-7.3C2.5 8.9 5.1 9.8 7.8 9.8h3.4C10.9 8.5 10 7.5 8 7.2c1.2-.7 2.8-.8 4.4-.2-.7-1-.9-2.2-.4-4z"/></svg>
+  </div>
+  <div class="brand">
+    <b>The Sanctum</b>
+    <span>Personal CRM · Second Brain</span>
+  </div>
+  <div class="head-spacer"></div>
+  <div class="clock">
+    <b id="clock-time">--:--</b><br>
+    <span id="clock-date">—</span>
+  </div>
+  <div class="watch" id="watch"><i></i><span id="watch-label">Day Watch</span></div>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+
+    <!-- ================= LEFT ================= -->
+    <div class="col">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Missions</h2><span class="tag">Tasks</span>
+          <span class="count" id="task-count">0</span>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <input id="task-input" placeholder="New mission…" aria-label="New task">
+          </div>
+          <div class="row">
+            <select id="task-sphere" aria-label="Task sphere">
+              <option value="work">WORK</option>
+              <option value="life">LIFE</option>
+            </select>
+            <button class="primary" id="task-add" style="flex:1">Deploy</button>
+          </div>
+          <div class="filters" style="margin-top:12px" id="task-filters">
+            <button data-f="all" class="active">All</button>
+            <button data-f="work">Work</button>
+            <button data-f="life">Life</button>
+            <button data-f="done">Done</button>
+          </div>
+          <ul class="list" id="task-list"></ul>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Protocol</h2><span class="tag">Daily habits</span>
+        </div>
+        <div class="panel-body">
+          <div class="row" style="margin-bottom:10px">
+            <input id="habit-input" placeholder="New habit — train, read, sleep by 11…" aria-label="New habit">
+            <button class="primary" id="habit-add">Add</button>
+          </div>
+          <div id="habit-list"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= CENTER ================= -->
+    <div class="col center">
+      <section class="oath" aria-label="The oath">
+        <svg class="bat" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.5 1.8.3 3-.4 4 1.6-.6 3.2-.5 4.4.2-2 .3-2.9 1.3-3.2 2.6h3.4c2.7 0 5.3-.9 6.8-2.3-1 3.9-4.6 6.9-9.2 7.3.7.8 1.1 1.9 1.2 3.2-1-.9-2-1.4-3-1.4s-2 .5-3 1.4c.1-1.3.5-2.4 1.2-3.2-4.6-.4-8.2-3.4-9.2-7.3C2.5 8.9 5.1 9.8 7.8 9.8h3.4C10.9 8.5 10 7.5 8 7.2c1.2-.7 2.8-.8 4.4-.2-.7-1-.9-2.2-.4-4z"/></svg>
+        <div class="hindi">बलिदान परम धर्म</div>
+        <div class="roman">Balidan Parmo Dharma</div>
+        <div class="meaning">Sacrifice is the highest duty</div>
+        <div class="rule"></div>
+        <div class="second" id="second-quote"></div>
+      </section>
+
+      <div class="stats">
+        <div class="stat"><div class="n" id="stat-open">0</div><div class="l">Open missions</div></div>
+        <div class="stat"><div class="n" id="stat-done">0</div><div class="l">Cleared today</div></div>
+        <div class="stat"><div class="n" id="stat-people">0</div><div class="l">People tracked</div></div>
+        <div class="stat"><div class="n" id="stat-streak">0<em>d</em></div><div class="l">Best streak</div></div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Objectives</h2><span class="tag">Long game</span>
+        </div>
+        <div class="panel-body">
+          <div class="row" style="margin-bottom:6px">
+            <input id="goal-input" placeholder="New objective — click its bar to set progress" aria-label="New goal">
+            <button class="primary" id="goal-add">Add</button>
+          </div>
+          <div id="goal-list"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= RIGHT ================= -->
+    <div class="col">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>People</h2><span class="tag">Allies</span>
+          <span class="count" id="people-count">0</span>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <input id="person-name" placeholder="Name" aria-label="Person name">
+            <select id="person-sphere" aria-label="Person sphere">
+              <option value="work">WORK</option>
+              <option value="life">LIFE</option>
+            </select>
+          </div>
+          <div class="row">
+            <input id="person-note" placeholder="Context — who they are, what matters" aria-label="Person note">
+            <button class="primary" id="person-add">Add</button>
+          </div>
+          <ul class="list" id="people-list" style="margin-top:12px"></ul>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>The Vault</h2><span class="tag">Notes · capture</span>
+          <span class="count" id="note-count">0</span>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <input id="note-title" placeholder="Title" aria-label="Note title">
+          </div>
+          <div class="row">
+            <textarea id="note-body" placeholder="Capture the thought before it escapes…" aria-label="Note body"></textarea>
+          </div>
+          <div class="row">
+            <button class="primary" id="note-add" style="flex:1">Lock it in</button>
+          </div>
+          <ul class="list" id="note-list" style="margin-top:12px"></ul>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    <div class="io">
+      <button id="export-btn">Export vault</button>
+      <button id="import-btn">Import vault</button>
+      <input type="file" id="import-file" accept=".json" hidden>
+    </div>
+    <div>It's not who I am underneath — it's what I do that defines me.</div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const KEY = 'sanctum.v1';
+  const $ = id => document.getElementById(id);
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const todayKey = (d = new Date()) =>
+    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [] };
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) db = Object.assign(db, JSON.parse(raw));
+  } catch (e) { /* corrupted store — start fresh */ }
+  const save = () => localStorage.setItem(KEY, JSON.stringify(db));
+
+  /* ---------- clock & watch ---------- */
+  function tickClock() {
+    const now = new Date();
+    $('clock-time').textContent = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    $('clock-date').textContent = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    const h = now.getHours();
+    const night = h >= 21 || h < 5;
+    $('watch').classList.toggle('night', night);
+    $('watch-label').textContent = night ? 'Night Watch' : 'Day Watch';
+  }
+  tickClock();
+  setInterval(tickClock, 30000);
+
+  /* ---------- rotating second quote ---------- */
+  const QUOTES = [
+    '"Why do we fall? So we can learn to pick ourselves up." — Alfred',
+    '"It\'s not who I am underneath, but what I do that defines me."',
+    '"The training is nothing. The will is everything."',
+    '"A hero can be anyone. Even a man doing something as simple as putting a coat around a young boy\'s shoulders."',
+    '"If you make yourself more than just a man… you become something else entirely. A legend."'
+  ];
+  let qi = 0;
+  const sq = $('second-quote');
+  const showQuote = () => { sq.style.opacity = 0; setTimeout(() => { sq.textContent = QUOTES[qi % QUOTES.length]; sq.style.opacity = 1; qi++; }, 800); };
+  showQuote();
+  setInterval(showQuote, 12000);
+
+  /* ---------- stats ---------- */
+  function renderStats() {
+    $('stat-open').textContent = db.tasks.filter(t => !t.done).length;
+    $('stat-done').textContent = db.tasks.filter(t => t.done && t.doneOn === todayKey()).length;
+    $('stat-people').textContent = db.people.length;
+    let best = 0;
+    db.habits.forEach(h => { best = Math.max(best, streakOf(h)); });
+    $('stat-streak').innerHTML = best + '<em>d</em>';
+  }
+
+  /* ---------- missions ---------- */
+  let taskFilter = 'all';
+  function renderTasks() {
+    const ul = $('task-list');
+    const shown = db.tasks.filter(t =>
+      taskFilter === 'all'  ? !t.done :
+      taskFilter === 'done' ? t.done  :
+      (t.sphere === taskFilter && !t.done)
+    );
+    $('task-count').textContent = db.tasks.filter(t => !t.done).length + ' open';
+    ul.innerHTML = shown.length ? '' : '<div class="empty">No missions here. Gotham is quiet.</div>';
+    shown.forEach(t => {
+      const li = document.createElement('li');
+      li.className = 'task' + (t.done ? ' done' : '');
+      li.innerHTML =
+        '<button class="check" aria-label="Toggle done"><svg viewBox="0 0 16 16"><path d="M2 8l4 4 8-8"/></svg></button>' +
+        '<span class="txt">' + esc(t.text) + '</span>' +
+        '<span class="chip ' + t.sphere + '">' + t.sphere + '</span>' +
+        '<button class="ghost" aria-label="Delete task">✕</button>';
+      li.querySelector('.check').onclick = () => {
+        t.done = !t.done;
+        t.doneOn = t.done ? todayKey() : null;
+        save(); renderTasks(); renderStats();
+      };
+      li.querySelector('.ghost').onclick = () => {
+        db.tasks = db.tasks.filter(x => x.id !== t.id);
+        save(); renderTasks(); renderStats();
+      };
+      ul.appendChild(li);
+    });
+  }
+  function addTask() {
+    const v = $('task-input').value.trim();
+    if (!v) return;
+    db.tasks.unshift({ id: uid(), text: v, sphere: $('task-sphere').value, done: false, doneOn: null });
+    $('task-input').value = '';
+    save(); renderTasks(); renderStats();
+  }
+  $('task-add').onclick = addTask;
+  $('task-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+  $('task-filters').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    taskFilter = b.dataset.f;
+    [...$('task-filters').children].forEach(x => x.classList.toggle('active', x === b));
+    renderTasks();
+  });
+
+  /* ---------- people ---------- */
+  const daysSince = iso => Math.floor((new Date(todayKey()) - new Date(iso)) / 864e5);
+  function renderPeople() {
+    const ul = $('people-list');
+    $('people-count').textContent = db.people.length;
+    ul.innerHTML = db.people.length ? '' : '<div class="empty">No allies logged yet.</div>';
+    [...db.people].sort((a, b) => daysSince(b.lastTouch) - daysSince(a.lastTouch)).forEach(p => {
+      const d = daysSince(p.lastTouch);
+      const li = document.createElement('li');
+      li.className = 'person';
+      li.innerHTML =
+        '<div class="top">' +
+          '<div class="avatar">' + esc(p.name[0].toUpperCase()) + '</div>' +
+          '<div class="who"><b>' + esc(p.name) + '</b><small>' + p.sphere + '</small></div>' +
+          '<div class="touch' + (d > 30 ? ' cold' : '') + '">' + (d === 0 ? 'today' : d + 'd ago') + '<br>last touch</div>' +
+        '</div>' +
+        (p.note ? '<div class="pnote">' + esc(p.note) + '</div>' : '') +
+        '<div class="actions">' +
+          '<button class="ghost touch-btn" style="font-size:10px;letter-spacing:.1em;font-family:var(--mono)">MARK CONTACTED</button>' +
+          '<button class="ghost del-btn" aria-label="Delete person">✕</button>' +
+        '</div>';
+      li.querySelector('.touch-btn').onclick = () => { p.lastTouch = todayKey(); save(); renderPeople(); };
+      li.querySelector('.del-btn').onclick = () => { db.people = db.people.filter(x => x.id !== p.id); save(); renderPeople(); renderStats(); };
+      ul.appendChild(li);
+    });
+  }
+  function addPerson() {
+    const name = $('person-name').value.trim();
+    if (!name) return;
+    db.people.unshift({ id: uid(), name, sphere: $('person-sphere').value, note: $('person-note').value.trim(), lastTouch: todayKey() });
+    $('person-name').value = ''; $('person-note').value = '';
+    save(); renderPeople(); renderStats();
+  }
+  $('person-add').onclick = addPerson;
+  $('person-name').addEventListener('keydown', e => { if (e.key === 'Enter') addPerson(); });
+
+  /* ---------- vault ---------- */
+  function renderNotes() {
+    const ul = $('note-list');
+    $('note-count').textContent = db.notes.length;
+    ul.innerHTML = db.notes.length ? '' : '<div class="empty">The vault is empty.</div>';
+    db.notes.forEach(n => {
+      const li = document.createElement('li');
+      li.className = 'note';
+      li.innerHTML =
+        (n.title ? '<b>' + esc(n.title) + '</b>' : '') +
+        '<p>' + esc(n.body) + '</p>' +
+        '<div class="meta"><span>' + n.when + '</span><button class="ghost" aria-label="Delete note">✕</button></div>';
+      li.querySelector('.ghost').onclick = () => { db.notes = db.notes.filter(x => x.id !== n.id); save(); renderNotes(); };
+      ul.appendChild(li);
+    });
+  }
+  function addNote() {
+    const body = $('note-body').value.trim();
+    const title = $('note-title').value.trim();
+    if (!body && !title) return;
+    db.notes.unshift({
+      id: uid(), title, body,
+      when: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' · ' +
+            new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    });
+    $('note-title').value = ''; $('note-body').value = '';
+    save(); renderNotes();
+  }
+  $('note-add').onclick = addNote;
+
+  /* ---------- protocol (habits) ---------- */
+  const last7 = () => Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d;
+  });
+  function streakOf(h) {
+    let s = 0; const d = new Date();
+    if (!h.hits.includes(todayKey(d))) d.setDate(d.getDate() - 1);
+    while (h.hits.includes(todayKey(d))) { s++; d.setDate(d.getDate() - 1); }
+    return s;
+  }
+  function renderHabits() {
+    const box = $('habit-list');
+    box.innerHTML = db.habits.length ? '' : '<div class="empty">No protocols yet. Discipline starts here.</div>';
+    db.habits.forEach(h => {
+      const row = document.createElement('div');
+      row.className = 'habit';
+      const days = last7().map(d => {
+        const k = todayKey(d);
+        const hit = h.hits.includes(k);
+        const isToday = k === todayKey();
+        return '<button class="day' + (hit ? ' hit' : '') + (isToday ? ' today' : '') + '" data-k="' + k + '" aria-label="' + k + '">' +
+               'SMTWTFS'[d.getDay()] + '</button>';
+      }).join('');
+      row.innerHTML =
+        '<span class="hname">' + esc(h.name) + '</span>' +
+        '<span class="days">' + days + '</span>' +
+        '<span class="streak">' + streakOf(h) + 'd</span>' +
+        '<button class="ghost" aria-label="Delete habit">✕</button>';
+      row.querySelectorAll('.day').forEach(btn => {
+        btn.onclick = () => {
+          const k = btn.dataset.k;
+          h.hits = h.hits.includes(k) ? h.hits.filter(x => x !== k) : [...h.hits, k];
+          save(); renderHabits(); renderStats();
+        };
+      });
+      row.querySelector('.ghost').onclick = () => { db.habits = db.habits.filter(x => x.id !== h.id); save(); renderHabits(); renderStats(); };
+      box.appendChild(row);
+    });
+  }
+  function addHabit() {
+    const v = $('habit-input').value.trim();
+    if (!v) return;
+    db.habits.push({ id: uid(), name: v, hits: [] });
+    $('habit-input').value = '';
+    save(); renderHabits();
+  }
+  $('habit-add').onclick = addHabit;
+  $('habit-input').addEventListener('keydown', e => { if (e.key === 'Enter') addHabit(); });
+
+  /* ---------- objectives ---------- */
+  function renderGoals() {
+    const box = $('goal-list');
+    box.innerHTML = db.goals.length ? '' : '<div class="empty">No objectives set.</div>';
+    db.goals.forEach(g => {
+      const row = document.createElement('div');
+      row.className = 'goal';
+      row.innerHTML =
+        '<div class="gtop"><span class="gname">' + esc(g.name) + '</span>' +
+        '<span class="gpct">' + g.pct + '%</span>' +
+        '<button class="ghost" aria-label="Delete goal">✕</button></div>' +
+        '<div class="bar" title="Click to set progress"><i style="width:' + g.pct + '%"></i></div>';
+      row.querySelector('.bar').onclick = e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        g.pct = Math.round(((e.clientX - r.left) / r.width) * 100);
+        save(); renderGoals();
+      };
+      row.querySelector('.ghost').onclick = () => { db.goals = db.goals.filter(x => x.id !== g.id); save(); renderGoals(); };
+      box.appendChild(row);
+    });
+  }
+  function addGoal() {
+    const v = $('goal-input').value.trim();
+    if (!v) return;
+    db.goals.push({ id: uid(), name: v, pct: 0 });
+    $('goal-input').value = '';
+    save(); renderGoals();
+  }
+  $('goal-add').onclick = addGoal;
+  $('goal-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGoal(); });
+
+  /* ---------- export / import ---------- */
+  $('export-btn').onclick = () => {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'sanctum-backup-' + todayKey() + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $('import-btn').onclick = () => $('import-file').click();
+  $('import-file').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [] }, data);
+        save(); renderAll();
+      } catch (err) { alert('That file is not a valid Sanctum backup.'); }
+    };
+    r.readAsText(f);
+    e.target.value = '';
+  };
+
+  function renderAll() {
+    renderTasks(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderStats();
+  }
+  renderAll();
+})();
+</script>
+</body>
+</html>
