@@ -257,6 +257,22 @@
   .chip.work{ color:var(--gold); border-color:rgba(200,162,75,.35); }
   .chip.life{ color:#7da2c1; border-color:rgba(125,162,193,.35); }
 
+  /* ---------- inbox ---------- */
+  .inbox-item{
+    display:flex; align-items:center; gap:8px;
+    background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-radius:3px; padding:9px 11px;
+  }
+  .inbox-item .txt{ flex:1; font-size:13.5px; min-width:0; overflow-wrap:break-word; }
+  .inbox-item .mv{
+    background:none; border:1px solid var(--line); border-radius:2px;
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.1em;
+    padding:4px 7px; color:var(--muted); cursor:pointer; flex:none;
+  }
+  .inbox-item .mv:hover{ border-color:var(--faint); color:var(--text); }
+  .inbox-item .mv.w:hover{ border-color:rgba(200,162,75,.5); color:var(--gold); }
+  .inbox-item .mv.l:hover{ border-color:rgba(125,162,193,.5); color:#7da2c1; }
+
   /* ---------- people ---------- */
   .person{
     background:var(--bg-deep); border:1px solid var(--line-soft);
@@ -450,6 +466,20 @@
     <div class="col">
       <section class="panel">
         <div class="panel-head">
+          <h2>Inbox</h2><span class="tag">Capture now · sort later</span>
+          <span class="count" id="inbox-count">0</span>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <input id="inbox-input" placeholder="Anything on your mind — dump it here" aria-label="Inbox capture">
+            <button class="primary" id="inbox-add">Add</button>
+          </div>
+          <ul class="list" id="inbox-list" style="margin-top:12px"></ul>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
           <h2>Missions</h2><span class="tag">Tasks</span>
           <span class="count" id="task-count">0</span>
         </div>
@@ -579,13 +609,14 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 } };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [] };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
   } catch (e) { /* corrupted store — start fresh */ }
   if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
   if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
+  if (!Array.isArray(db.inbox)) db.inbox = [];
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
     delete db.vow;
@@ -661,6 +692,43 @@
     [...$('task-filters').children].forEach(x => x.classList.toggle('active', x === b));
     renderTasks();
   });
+
+  /* ---------- inbox ---------- */
+  function renderInbox() {
+    const ul = $('inbox-list');
+    $('inbox-count').textContent = db.inbox.length;
+    ul.innerHTML = db.inbox.length ? '' : '<div class="empty">Empty. Capture anything — sort it later.</div>';
+    db.inbox.forEach(it => {
+      const li = document.createElement('li');
+      li.className = 'inbox-item';
+      li.innerHTML =
+        '<span class="txt">' + esc(it.text) + '</span>' +
+        '<button class="mv w" title="Move to Missions as WORK">→ WORK</button>' +
+        '<button class="mv l" title="Move to Missions as LIFE">→ LIFE</button>' +
+        '<button class="ghost" aria-label="Delete">✕</button>';
+      const moveTo = sphere => {
+        db.tasks.unshift({ id: uid(), text: it.text, sphere, done: false, doneOn: null });
+        db.inbox = db.inbox.filter(x => x.id !== it.id);
+        save(); renderInbox(); renderTasks(); renderStats();
+      };
+      li.querySelector('.w').onclick = () => moveTo('work');
+      li.querySelector('.l').onclick = () => moveTo('life');
+      li.querySelector('.ghost').onclick = () => {
+        db.inbox = db.inbox.filter(x => x.id !== it.id);
+        save(); renderInbox();
+      };
+      ul.appendChild(li);
+    });
+  }
+  function addInbox() {
+    const v = $('inbox-input').value.trim();
+    if (!v) return;
+    db.inbox.unshift({ id: uid(), text: v });
+    $('inbox-input').value = '';
+    save(); renderInbox();
+  }
+  $('inbox-add').onclick = addInbox;
+  $('inbox-input').addEventListener('keydown', e => { if (e.key === 'Enter') addInbox(); });
 
   /* ---------- people ---------- */
   const daysSince = iso => Math.floor((new Date(todayKey()) - new Date(iso)) / 864e5);
@@ -931,9 +999,10 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 } }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [] }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
+        if (!Array.isArray(db.inbox)) db.inbox = [];
         save(); renderAll();
       } catch (err) { alert('That file is not a valid Sanctum backup.'); }
     };
@@ -942,7 +1011,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderStats();
+    renderTasks(); renderInbox(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderStats();
   }
   renderAll();
 })();
