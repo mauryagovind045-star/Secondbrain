@@ -133,6 +133,12 @@
     color:var(--red); letter-spacing:.05em;
   }
   .panel-body{ padding:14px 16px 16px; }
+  .fold{
+    margin-left:auto; background:none; border:none; padding:0 4px;
+    color:var(--muted); cursor:pointer; font-size:13px; line-height:1;
+    letter-spacing:0;
+  }
+  .fold:hover{ color:var(--text); }
 
   /* ---------- front page: banner + year + status ---------- */
   .front{
@@ -658,6 +664,7 @@
       <section class="panel">
         <div class="panel-head">
           <h2>The Vows</h2><span class="tag">21 days each · iron discipline</span>
+          <button class="fold" id="vows-fold" aria-label="Collapse or expand The Vows">▾</button>
         </div>
         <div class="panel-body" id="vow-body"></div>
       </section>
@@ -784,7 +791,7 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [] };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true } };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -794,6 +801,7 @@
   if (!Array.isArray(db.inbox)) db.inbox = [];
   if (!Array.isArray(db.expenses)) db.expenses = [];
   if (!Array.isArray(db.dreams)) db.dreams = [];
+  if (!db.ui) db.ui = { vowsOpen: true };
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
     delete db.vow;
@@ -1227,6 +1235,15 @@
   $('exp-add').onclick = addExpense;
   $('exp-note').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
   $('exp-amt').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
+
+  /* ---------- vows fold ---------- */
+  const vowsFold = $('vows-fold');
+  function applyVowsFold() {
+    $('vow-body').hidden = !db.ui.vowsOpen;
+    vowsFold.textContent = db.ui.vowsOpen ? '▾' : '▸';
+  }
+  vowsFold.onclick = () => { db.ui.vowsOpen = !db.ui.vowsOpen; save(); applyVowsFold(); };
+  applyVowsFold();
 
   /* ---------- view switching ---------- */
   document.querySelectorAll('.view-btn').forEach(btn => {
