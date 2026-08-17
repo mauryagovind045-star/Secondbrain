@@ -279,6 +279,18 @@
   }
   .due.today{ color:var(--gold); }
   .due.over{ color:var(--red); }
+  .chip.p-high{ color:var(--red); border-color:rgba(212,53,59,.4); cursor:pointer; }
+  .chip.p-med{ color:var(--gold); border-color:rgba(200,162,75,.35); cursor:pointer; }
+  .chip.p-low{ color:var(--faint); cursor:pointer; }
+  .tasks-wrap{ max-width:880px; margin:0 auto; }
+  .tasks-wrap .list{ display:flex; flex-direction:column; gap:6px; }
+  .tgroup{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    letter-spacing:.2em; text-transform:uppercase;
+    margin:16px 0 7px; display:flex; align-items:center; gap:10px;
+  }
+  .tgroup::after{ content:""; flex:1; height:1px; background:var(--line-soft); }
+  .tgroup.hot{ color:var(--red); }
 
   /* ---------- inbox ---------- */
   .inbox-item{
@@ -588,6 +600,7 @@
   </div>
   <nav class="views" aria-label="Pages">
     <button class="view-btn active" data-view="dash">Command</button>
+    <button class="view-btn" data-view="tasks">Missions</button>
     <button class="view-btn" data-view="dreams">Dreams</button>
     <button class="view-btn" data-view="ledger">Ledger</button>
   </nav>
@@ -691,6 +704,7 @@
             <button data-f="done">Done</button>
           </div>
           <ul class="list" id="task-list"></ul>
+          <button class="inbox-toggle" id="missions-open">▸ OPEN MISSION CONTROL</button>
         </div>
       </section>
     </div>
@@ -750,6 +764,32 @@
       </section>
     </div>
   </div>
+  </div>
+
+  <div id="view-tasks" hidden>
+    <div class="tasks-wrap">
+      <div class="dreams-head">
+        <h2>Mission Control</h2><span class="tag">Every task · every horizon</span>
+      </div>
+      <div class="row">
+        <input id="pt-input" placeholder="New mission…" aria-label="New task">
+      </div>
+      <div class="row">
+        <input id="pt-due" type="date" aria-label="Due date" style="max-width:140px">
+        <select id="pt-prio" aria-label="Priority">
+          <option value="med">MED</option>
+          <option value="high">HIGH</option>
+          <option value="low">LOW</option>
+        </select>
+        <select id="pt-sphere" aria-label="Sphere">
+          <option value="work">WORK</option>
+          <option value="life">LIFE</option>
+        </select>
+        <button class="primary" id="pt-add" style="flex:1">Deploy</button>
+      </div>
+      <div class="filters" id="pt-tabs" style="margin:16px 0 4px"></div>
+      <div id="pt-list"></div>
+    </div>
   </div>
 
   <div id="view-dreams" hidden>
@@ -849,7 +889,11 @@
 
   /* ---------- missions ---------- */
   let taskFilter = 'today';
+  let pageTab = 'today';
   const dayDiff = iso => Math.round((new Date(iso) - new Date(todayKey())) / 864e5);
+  const PRIO_NEXT = { low: 'med', med: 'high', high: 'low' };
+  const PRIO_RANK = { high: 0, med: 1, low: 2 };
+  const prioOf = t => t.prio || 'med';
   function dueChip(t) {
     if (!t.due || t.done) return '';
     const d = dayDiff(t.due);
@@ -857,6 +901,32 @@
     if (d === 0) return '<span class="due today">TODAY</span>';
     if (d === 1) return '<span class="due">TMRW</span>';
     return '<span class="due">' + shortDate(t.due).toUpperCase() + '</span>';
+  }
+  const sortOpen = (a, b) =>
+    (a.due || '9999').localeCompare(b.due || '9999') || PRIO_RANK[prioOf(a)] - PRIO_RANK[prioOf(b)];
+  function refreshTasks() { renderTasks(); renderTasksPage(); renderStats(); }
+  function taskRow(t) {
+    const li = document.createElement('li');
+    li.className = 'task' + (t.done ? ' done' : '');
+    li.innerHTML =
+      '<button class="check" aria-label="Toggle done"><svg viewBox="0 0 16 16"><path d="M2 8l4 4 8-8"/></svg></button>' +
+      '<span class="txt">' + esc(t.text) + '</span>' +
+      dueChip(t) +
+      (t.done ? '' : '<span class="chip p-' + prioOf(t) + '" title="Click to change priority">' + prioOf(t) + '</span>') +
+      '<span class="chip ' + t.sphere + '">' + t.sphere + '</span>' +
+      '<button class="ghost" aria-label="Delete task">✕</button>';
+    li.querySelector('.check').onclick = () => {
+      t.done = !t.done;
+      t.doneOn = t.done ? todayKey() : null;
+      save(); refreshTasks();
+    };
+    const pchip = li.querySelector('.chip.p-' + prioOf(t));
+    if (pchip) pchip.onclick = () => { t.prio = PRIO_NEXT[prioOf(t)]; save(); refreshTasks(); };
+    li.querySelector('.ghost').onclick = () => {
+      db.tasks = db.tasks.filter(x => x.id !== t.id);
+      save(); refreshTasks();
+    };
+    return li;
   }
   function renderTasks() {
     const ul = $('task-list');
@@ -866,37 +936,18 @@
       taskFilter === 'all'   ? !t.done :
       taskFilter === 'today' ? (!t.done && inDays(t, 0)) :
                                (!t.done && inDays(t, 7))
-    ).sort((a, b) => (a.done ? 0 : (a.due || '9999').localeCompare(b.due || '9999')));
+    ).sort((a, b) => (a.done ? 0 : sortOpen(a, b)));
     $('task-count').textContent = db.tasks.filter(t => !t.done).length + ' open';
     ul.innerHTML = shown.length ? '' :
       '<div class="empty">' + (taskFilter === 'today' ? 'Nothing due today. Well held.' : 'No missions here.') + '</div>';
-    shown.forEach(t => {
-      const li = document.createElement('li');
-      li.className = 'task' + (t.done ? ' done' : '');
-      li.innerHTML =
-        '<button class="check" aria-label="Toggle done"><svg viewBox="0 0 16 16"><path d="M2 8l4 4 8-8"/></svg></button>' +
-        '<span class="txt">' + esc(t.text) + '</span>' +
-        dueChip(t) +
-        '<span class="chip ' + t.sphere + '">' + t.sphere + '</span>' +
-        '<button class="ghost" aria-label="Delete task">✕</button>';
-      li.querySelector('.check').onclick = () => {
-        t.done = !t.done;
-        t.doneOn = t.done ? todayKey() : null;
-        save(); renderTasks(); renderStats();
-      };
-      li.querySelector('.ghost').onclick = () => {
-        db.tasks = db.tasks.filter(x => x.id !== t.id);
-        save(); renderTasks(); renderStats();
-      };
-      ul.appendChild(li);
-    });
+    shown.forEach(t => ul.appendChild(taskRow(t)));
   }
   function addTask() {
     const v = $('task-input').value.trim();
     if (!v) return;
-    db.tasks.unshift({ id: uid(), text: v, sphere: $('task-sphere').value, due: $('task-due').value || null, done: false, doneOn: null });
+    db.tasks.unshift({ id: uid(), text: v, sphere: $('task-sphere').value, due: $('task-due').value || null, prio: 'med', done: false, doneOn: null });
     $('task-input').value = ''; $('task-due').value = '';
-    save(); renderTasks(); renderStats();
+    save(); refreshTasks();
   }
   $('task-add').onclick = addTask;
   $('task-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
@@ -906,6 +957,74 @@
     [...$('task-filters').children].forEach(x => x.classList.toggle('active', x === b));
     renderTasks();
   });
+  $('missions-open').onclick = () => showView('tasks');
+
+  /* ---------- mission control page ---------- */
+  function renderTasksPage() {
+    const open = db.tasks.filter(t => !t.done);
+    const todayN = open.filter(t => !t.due || dayDiff(t.due) <= 0).length;
+    const TABS = [
+      ['today', 'Today' + (todayN ? ' · ' + todayN : '')],
+      ['tmrw', 'Tomorrow'], ['week', '7 days'], ['someday', 'Someday'],
+      ['all', 'All'], ['done', 'Done']
+    ];
+    $('pt-tabs').innerHTML = TABS.map(([v, l]) =>
+      '<button data-t="' + v + '"' + (pageTab === v ? ' class="active"' : '') + '>' + l + '</button>').join('');
+    $('pt-tabs').querySelectorAll('button').forEach(b => {
+      b.onclick = () => { pageTab = b.dataset.t; renderTasksPage(); };
+    });
+
+    const box = $('pt-list');
+    box.innerHTML = '';
+    const addGroup = (label, items, hot) => {
+      if (!items.length) return;
+      const h = document.createElement('div');
+      h.className = 'tgroup' + (hot ? ' hot' : '');
+      h.textContent = label;
+      box.appendChild(h);
+      const ul = document.createElement('ul');
+      ul.className = 'list';
+      items.sort(sortOpen).forEach(t => ul.appendChild(taskRow(t)));
+      box.appendChild(ul);
+    };
+
+    if (pageTab === 'today') {
+      addGroup('Overdue', open.filter(t => t.due && dayDiff(t.due) < 0), true);
+      addGroup('Due today', open.filter(t => t.due && dayDiff(t.due) === 0));
+      addGroup('Anytime', open.filter(t => !t.due));
+      if (!box.children.length) box.innerHTML = '<div class="empty" style="padding:40px 0">Nothing on the board today. Well held.</div>';
+      return;
+    }
+    let items, label;
+    if (pageTab === 'tmrw')         { items = open.filter(t => t.due && dayDiff(t.due) === 1); label = 'Tomorrow'; }
+    else if (pageTab === 'week')    { items = open.filter(t => t.due && dayDiff(t.due) >= 0 && dayDiff(t.due) <= 7); label = 'Next 7 days'; }
+    else if (pageTab === 'someday') { items = open.filter(t => !t.due); label = 'Someday · no date'; }
+    else if (pageTab === 'all')     { items = open.slice(); label = 'All open'; }
+    else {
+      const done = db.tasks.filter(t => t.done)
+        .sort((a, b) => (b.doneOn || '').localeCompare(a.doneOn || ''));
+      addGroup('Done', done);
+      if (!done.length) box.innerHTML = '<div class="empty" style="padding:40px 0">Nothing cleared yet.</div>';
+      return;
+    }
+    addGroup(label, items);
+    if (!items.length) box.innerHTML = '<div class="empty" style="padding:40px 0">No missions here.</div>';
+  }
+  function addTaskFromPage() {
+    const v = $('pt-input').value.trim();
+    if (!v) return;
+    db.tasks.unshift({
+      id: uid(), text: v,
+      sphere: $('pt-sphere').value,
+      due: $('pt-due').value || null,
+      prio: $('pt-prio').value,
+      done: false, doneOn: null
+    });
+    $('pt-input').value = ''; $('pt-due').value = '';
+    save(); refreshTasks();
+  }
+  $('pt-add').onclick = addTaskFromPage;
+  $('pt-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTaskFromPage(); });
 
   /* ---------- inbox ---------- */
   let inboxOpen = false;
@@ -1257,7 +1376,7 @@
   /* ---------- view switching ---------- */
   function showView(name) {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-    ['dash', 'dreams', 'ledger'].forEach(v => { $('view-' + v).hidden = v !== name; });
+    ['dash', 'tasks', 'dreams', 'ledger'].forEach(v => { $('view-' + v).hidden = v !== name; });
     window.scrollTo(0, 0);
   }
   document.querySelectorAll('.view-btn').forEach(btn => {
@@ -1443,7 +1562,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderInbox(); renderPeople(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderStats();
+    renderTasks(); renderTasksPage(); renderInbox(); renderPeople(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderStats();
   }
   renderAll();
 })();
