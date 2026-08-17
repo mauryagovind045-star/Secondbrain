@@ -95,7 +95,7 @@
   }
   .grid{
     display:grid;
-    grid-template-columns:minmax(300px,360px) minmax(420px,1fr) minmax(300px,360px);
+    grid-template-columns:minmax(290px,340px) minmax(400px,1fr) minmax(290px,340px);
     gap:20px;
     align-items:start;
   }
@@ -103,7 +103,7 @@
 
   /* ---------- panels ---------- */
   .panel{
-    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    background:var(--panel);
     border:1px solid var(--line-soft);
     border-radius:var(--radius);
     overflow:hidden;
@@ -127,106 +127,86 @@
   }
   .panel-body{ padding:14px 16px 16px; }
 
-  /* ---------- quote hero (the oath) ---------- */
-  .oath{
+  /* ---------- front page: oath + year + status ---------- */
+  .front{
     position:relative;
-    background:
-      radial-gradient(ellipse 60% 55% at 50% 42%, rgba(212,53,59,.07), transparent 70%),
-      linear-gradient(180deg,#191c20,#121417);
-    border:1px solid var(--line-soft);
-    border-radius:var(--radius);
-    padding:54px 30px 46px;
+    padding:58px 24px 34px;
     text-align:center;
-    overflow:hidden;
     isolation:isolate;
+    margin-bottom:30px;
   }
-  .oath::before, .oath::after{
-    content:""; position:absolute; left:0; right:0; height:3px;
-    background:linear-gradient(90deg, transparent, var(--red) 18%, var(--red) 82%, transparent);
+  .front::before, .front::after{
+    content:""; position:absolute; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, transparent, var(--red) 22%, var(--red) 78%, transparent);
   }
-  .oath::before{ top:0; }
-  .oath::after{ bottom:0; }
-  .oath .bat{
-    position:absolute; inset:0; margin:auto;
-    width:min(78%,460px); height:auto;
-    opacity:.05; z-index:-1; fill:#fff;
-    transform:translateY(-6%);
+  .front::before{ top:0; }
+  .front::after{ bottom:0; }
+  .front .bat{
+    position:absolute; top:24px; left:0; right:0; margin:0 auto;
+    width:min(60%,420px); height:auto;
+    opacity:.045; z-index:-1; fill:#fff;
   }
-  .oath .hindi{
+  .front .hindi{
     font-family:var(--display);
-    font-size:clamp(38px, 4.6vw, 62px);
+    font-size:clamp(40px, 4.8vw, 64px);
     color:#e8e9ec;
     line-height:1.25;
     text-shadow:0 0 34px rgba(212,53,59,.2);
   }
-  .oath .roman{
+  .front .roman{
     font-family:var(--heads); font-weight:700;
-    font-size:clamp(15px, 1.6vw, 21px);
+    font-size:clamp(15px, 1.6vw, 20px);
     letter-spacing:.42em; text-transform:uppercase;
-    color:var(--red); margin-top:16px; text-indent:.42em;
+    color:var(--red); margin-top:15px; text-indent:.42em;
   }
-  .oath .meaning{
+  .front .meaning{
     font-family:var(--mono); font-size:11px; color:var(--muted);
-    letter-spacing:.22em; text-transform:uppercase; margin-top:12px;
+    letter-spacing:.22em; text-transform:uppercase; margin-top:11px;
   }
-  .oath .rule{
-    width:54px; height:1px; background:var(--line);
-    margin:26px auto 0;
-  }
-  .oath .second{
-    margin-top:18px;
+  .front .second{
+    margin-top:16px;
     font-family:var(--body); font-weight:300; font-style:italic;
-    font-size:14px; color:var(--faint); letter-spacing:.03em;
-    min-height:22px; transition:opacity .8s ease;
+    font-size:13.5px; color:var(--faint); letter-spacing:.03em;
+    min-height:20px; transition:opacity .8s ease;
   }
-
-  /* ---------- the year (annual goal) ---------- */
-  .yg-title{
-    font-family:var(--heads); font-weight:600; font-size:27px;
-    letter-spacing:.12em; text-transform:uppercase; line-height:1.1;
+  .front-year{
+    max-width:860px; margin:36px auto 0; text-align:left;
   }
-  .yg-title em{ font-style:normal; color:var(--red); }
-  .yg-sub{
-    font-family:var(--mono); font-size:9.5px; color:var(--faint);
-    letter-spacing:.16em; text-transform:uppercase; margin-top:7px;
+  .fy-line{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  .fy-goal{
+    font-family:var(--heads); font-weight:600; font-size:23px;
+    letter-spacing:.14em; text-transform:uppercase; line-height:1;
   }
-  .yg-bar{
-    height:6px; background:var(--bg-deep); border:1px solid var(--line-soft);
-    border-radius:2px; margin-top:14px; overflow:hidden;
+  .fy-goal em{ font-style:normal; color:var(--red); }
+  .fy-meta{
+    margin-left:auto;
+    font-family:var(--mono); font-size:10px; color:var(--muted);
+    letter-spacing:.1em; text-transform:uppercase;
   }
-  .yg-bar i{
+  .fy-meta b{ color:var(--text); font-weight:500; }
+  .fy-bar{
+    height:5px; background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-radius:2px; margin-top:12px; overflow:hidden;
+  }
+  .fy-bar i{
     display:block; height:100%;
     background:linear-gradient(90deg,var(--red-dim),var(--red));
     transition:width .3s ease;
   }
-  .yg-row{
-    display:flex; align-items:center; gap:10px; margin-top:12px;
+  .fy-edit{
+    display:flex; align-items:center; gap:8px; margin-top:10px;
+    justify-content:flex-end;
   }
-  .yg-row .banked{
-    font-family:var(--mono); font-size:10.5px; color:var(--muted);
-    letter-spacing:.08em; white-space:nowrap;
+  .fy-edit input{ max-width:200px; font-size:12px; padding:7px 10px; }
+  .fy-edit button{ font-size:9.5px; padding:7px 12px; }
+  .front-stats{
+    margin-top:26px;
+    font-family:var(--mono); font-size:9.5px; color:var(--faint);
+    letter-spacing:.18em; text-transform:uppercase;
   }
-  .yg-row .banked b{ color:var(--text); font-weight:500; }
-  .yg-row input{ max-width:190px; margin-left:auto; }
-  .yg-row button{ font-size:10px; padding:8px 13px; }
-
-  /* ---------- stats strip ---------- */
-  .stats{
-    display:grid; grid-template-columns:repeat(4,1fr); gap:20px;
-  }
-  .stat{
-    background:linear-gradient(180deg,var(--panel-2),var(--panel));
-    border:1px solid var(--line-soft); border-radius:var(--radius);
-    padding:14px 16px 12px;
-  }
-  .stat .n{
-    font-family:var(--heads); font-weight:500; font-size:26px; line-height:1;
-  }
-  .stat .n em{ font-style:normal; color:var(--red); }
-  .stat .l{
-    font-family:var(--mono); font-size:9px; color:var(--faint);
-    letter-spacing:.18em; text-transform:uppercase; margin-top:7px;
-  }
+  .front-stats b{ color:var(--text); font-weight:500; }
+  .front-stats b em{ font-style:normal; color:var(--red); }
+  .front-stats .sep{ margin:0 10px; color:var(--line); }
 
   /* ---------- inputs ---------- */
   input, textarea, select{
@@ -439,14 +419,15 @@
   @media (max-width:1120px){
     .grid{ grid-template-columns:1fr 1fr; }
     .col.center{ grid-column:1 / -1; order:-1; }
-    .stats{ grid-template-columns:repeat(4,1fr); }
   }
   @media (max-width:720px){
     .grid{ grid-template-columns:1fr; }
-    .stats{ grid-template-columns:repeat(2,1fr); }
     header{ padding:12px 16px; flex-wrap:wrap; }
     .wrap{ padding:18px 14px 60px; }
     .clock{ display:none; }
+    .front{ padding:44px 8px 26px; }
+    .fy-meta{ margin-left:0; width:100%; }
+    .front-stats .sep{ margin:0 6px; }
   }
   @media (prefers-reduced-motion: reduce){
     *{ transition:none !important; animation:none !important; }
@@ -473,6 +454,21 @@
 </header>
 
 <div class="wrap">
+  <section class="front" aria-label="The oath and the year">
+    <svg class="bat" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.5 1.8.3 3-.4 4 1.6-.6 3.2-.5 4.4.2-2 .3-2.9 1.3-3.2 2.6h3.4c2.7 0 5.3-.9 6.8-2.3-1 3.9-4.6 6.9-9.2 7.3.7.8 1.1 1.9 1.2 3.2-1-.9-2-1.4-3-1.4s-2 .5-3 1.4c.1-1.3.5-2.4 1.2-3.2-4.6-.4-8.2-3.4-9.2-7.3C2.5 8.9 5.1 9.8 7.8 9.8h3.4C10.9 8.5 10 7.5 8 7.2c1.2-.7 2.8-.8 4.4-.2-.7-1-.9-2.2-.4-4z"/></svg>
+    <div class="hindi">बलिदान परम धर्म</div>
+    <div class="roman">Balidan Parmo Dharma</div>
+    <div class="meaning">Sacrifice is the highest duty</div>
+    <div class="second" id="second-quote"></div>
+    <div class="front-year" id="year-body"></div>
+    <div class="front-stats">
+      OPEN <b id="stat-open">0</b><span class="sep">·</span>
+      CLEARED TODAY <b id="stat-done">0</b><span class="sep">·</span>
+      PEOPLE <b id="stat-people">0</b><span class="sep">·</span>
+      BEST STREAK <b id="stat-streak">0<em>d</em></b>
+    </div>
+  </section>
+
   <div class="grid">
 
     <!-- ================= LEFT ================= -->
@@ -519,30 +515,6 @@
 
     <!-- ================= CENTER ================= -->
     <div class="col center">
-      <section class="oath" aria-label="The oath">
-        <svg class="bat" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.5 1.8.3 3-.4 4 1.6-.6 3.2-.5 4.4.2-2 .3-2.9 1.3-3.2 2.6h3.4c2.7 0 5.3-.9 6.8-2.3-1 3.9-4.6 6.9-9.2 7.3.7.8 1.1 1.9 1.2 3.2-1-.9-2-1.4-3-1.4s-2 .5-3 1.4c.1-1.3.5-2.4 1.2-3.2-4.6-.4-8.2-3.4-9.2-7.3C2.5 8.9 5.1 9.8 7.8 9.8h3.4C10.9 8.5 10 7.5 8 7.2c1.2-.7 2.8-.8 4.4-.2-.7-1-.9-2.2-.4-4z"/></svg>
-        <div class="hindi">बलिदान परम धर्म</div>
-        <div class="roman">Balidan Parmo Dharma</div>
-        <div class="meaning">Sacrifice is the highest duty</div>
-        <div class="rule"></div>
-        <div class="second" id="second-quote"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h2>The Year</h2><span class="tag">2026 · the one number that matters</span>
-          <span class="count" id="year-days"></span>
-        </div>
-        <div class="panel-body" id="year-body"></div>
-      </section>
-
-      <div class="stats">
-        <div class="stat"><div class="n" id="stat-open">0</div><div class="l">Open missions</div></div>
-        <div class="stat"><div class="n" id="stat-done">0</div><div class="l">Cleared today</div></div>
-        <div class="stat"><div class="n" id="stat-people">0</div><div class="l">People tracked</div></div>
-        <div class="stat"><div class="n" id="stat-streak">0<em>d</em></div><div class="l">Best streak</div></div>
-      </div>
-
       <section class="panel">
         <div class="panel-head">
           <h2>The Vows</h2><span class="tag">21 days each · iron discipline</span>
@@ -965,13 +937,13 @@
     const pct = Math.min(100, (y.earned / y.target) * 100);
     const fmt = n => '₹' + n.toLocaleString('en-IN');
 
-    $('year-days').textContent = daysLeft + ' days left';
     $('year-body').innerHTML =
-      '<div class="yg-title">Earn <em>' + fmt(y.target) + '</em></div>' +
-      '<div class="yg-sub">Fifty lakh by 31 December — everything above funds this.</div>' +
-      '<div class="yg-bar"><i style="width:' + pct + '%"></i></div>' +
-      '<div class="yg-row">' +
-        '<span class="banked"><b>' + fmt(y.earned) + '</b> banked · ' + pct.toFixed(1) + '%</span>' +
+      '<div class="fy-line">' +
+        '<span class="fy-goal">' + now.getFullYear() + ' — Earn <em>' + fmt(y.target) + '</em></span>' +
+        '<span class="fy-meta"><b>' + fmt(y.earned) + '</b> banked · ' + pct.toFixed(1) + '% · ' + daysLeft + ' days left</span>' +
+      '</div>' +
+      '<div class="fy-bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="fy-edit">' +
         '<input id="year-earned" type="number" min="0" placeholder="Total earned so far (₹)">' +
         '<button id="year-set">Set</button>' +
       '</div>';
