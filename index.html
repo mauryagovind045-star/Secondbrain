@@ -214,6 +214,10 @@
     transition:border-color .15s;
   }
   input::placeholder, textarea::placeholder{ color:var(--faint); }
+  input[type="date"]{ color-scheme:dark; cursor:pointer; }
+  input[type="date"]::-webkit-calendar-picker-indicator{
+    filter:invert(.65); cursor:pointer; opacity:.9;
+  }
   input:focus, textarea:focus, select:focus{ border-color:var(--red-dim); }
   textarea{ resize:vertical; min-height:60px; }
   select{ width:auto; cursor:pointer; font-family:var(--mono); font-size:11px; }
@@ -1322,6 +1326,11 @@
         '</div>' +
       '</div>';
     document.body.appendChild(scrim);
+
+    const dateInput = scrim.querySelector('#dm-date');
+    dateInput.addEventListener('click', () => {
+      try { dateInput.showPicker(); } catch (e) { /* browser without showPicker — icon still works */ }
+    });
 
     const cover = scrim.querySelector('.modal-cover');
     const fileInput = scrim.querySelector('input[type=file]');
