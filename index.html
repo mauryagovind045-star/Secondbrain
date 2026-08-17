@@ -629,32 +629,6 @@
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Missions</h2><span class="tag">Tasks</span>
-          <span class="count" id="task-count">0</span>
-        </div>
-        <div class="panel-body">
-          <div class="row">
-            <input id="task-input" placeholder="New mission…" aria-label="New task">
-          </div>
-          <div class="row">
-            <input id="task-due" type="date" aria-label="Due date" title="Due date (optional)" style="max-width:135px">
-            <select id="task-sphere" aria-label="Task sphere">
-              <option value="work">WORK</option>
-              <option value="life">LIFE</option>
-            </select>
-            <button class="primary" id="task-add" style="flex:1">Deploy</button>
-          </div>
-          <div class="filters" style="margin-top:12px" id="task-filters">
-            <button data-f="today" class="active">Today</button>
-            <button data-f="week">7 days</button>
-            <button data-f="all">All</button>
-            <button data-f="done">Done</button>
-          </div>
-          <ul class="list" id="task-list"></ul>
-        </div>
-      </section>
 
       <section class="panel">
         <div class="panel-head">
@@ -690,6 +664,33 @@
             <button class="primary" id="goal-add">Add</button>
           </div>
           <div id="goal-list"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Missions</h2><span class="tag">Tasks</span>
+          <span class="count" id="task-count">0</span>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <input id="task-input" placeholder="New mission…" aria-label="New task">
+          </div>
+          <div class="row">
+            <input id="task-due" type="date" aria-label="Due date" title="Due date (optional)" style="max-width:135px">
+            <select id="task-sphere" aria-label="Task sphere">
+              <option value="work">WORK</option>
+              <option value="life">LIFE</option>
+            </select>
+            <button class="primary" id="task-add" style="flex:1">Deploy</button>
+          </div>
+          <div class="filters" style="margin-top:12px" id="task-filters">
+            <button data-f="today" class="active">Today</button>
+            <button data-f="week">7 days</button>
+            <button data-f="all">All</button>
+            <button data-f="done">Done</button>
+          </div>
+          <ul class="list" id="task-list"></ul>
         </div>
       </section>
     </div>
