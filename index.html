@@ -272,6 +272,14 @@
   .inbox-item .mv:hover{ border-color:var(--faint); color:var(--text); }
   .inbox-item .mv.w:hover{ border-color:rgba(200,162,75,.5); color:var(--gold); }
   .inbox-item .mv.l:hover{ border-color:rgba(125,162,193,.5); color:#7da2c1; }
+  .inbox-toggle{
+    width:100%; margin-top:12px;
+    background:none; border:1px dashed var(--line); border-radius:3px;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.16em;
+    color:var(--muted); padding:8px;
+  }
+  .inbox-toggle:hover{ border-color:var(--faint); color:var(--text); }
+  #inbox-list{ max-height:340px; overflow-y:auto; }
 
   /* ---------- people ---------- */
   .person{
@@ -747,10 +755,28 @@
   });
 
   /* ---------- inbox ---------- */
+  let inboxOpen = false;
   function renderInbox() {
     const ul = $('inbox-list');
-    $('inbox-count').textContent = db.inbox.length;
-    ul.innerHTML = db.inbox.length ? '' : '<div class="empty">Empty. Capture anything — sort it later.</div>';
+    const n = db.inbox.length;
+    $('inbox-count').textContent = n;
+    ul.innerHTML = '';
+
+    const old = document.getElementById('inbox-toggle');
+    if (old) old.remove();
+
+    if (!n) {
+      ul.innerHTML = '<div class="empty">Empty. Capture anything — sort it later.</div>';
+      return;
+    }
+    const t = document.createElement('button');
+    t.id = 'inbox-toggle';
+    t.className = 'inbox-toggle';
+    t.textContent = inboxOpen ? '▾ CLOSE' : '▸ ' + n + ' WAITING — OPEN TO SORT';
+    t.onclick = () => { inboxOpen = !inboxOpen; renderInbox(); };
+    ul.parentNode.insertBefore(t, ul);
+    if (!inboxOpen) return;
+
     db.inbox.forEach(it => {
       const li = document.createElement('li');
       li.className = 'inbox-item';
