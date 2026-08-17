@@ -70,6 +70,13 @@
     letter-spacing:.18em; text-transform:uppercase; margin-top:4px;
   }
   .head-spacer{ flex:1; }
+  [hidden]{ display:none !important; }
+  .views{ display:flex; gap:6px; margin-left:26px; }
+  .view-btn{
+    font-size:10.5px; padding:7px 14px; letter-spacing:.2em;
+    border-radius:2px; color:var(--muted);
+  }
+  .view-btn.active{ border-color:var(--red-dim); color:var(--text); }
   .clock{
     font-family:var(--mono); font-size:12px; color:var(--muted);
     text-align:right; line-height:1.5; letter-spacing:.06em;
@@ -403,6 +410,94 @@
   .vow-foot .vbtn.danger-armed{ border-color:var(--red); color:var(--red); }
   @media (prefers-reduced-motion: reduce){ .vc.today{ animation:none; } }
 
+  /* ---------- dreams (vision board) ---------- */
+  .dreams-head{
+    display:flex; align-items:baseline; gap:14px; margin:4px 0 20px;
+  }
+  .dreams-head h2{
+    font-family:var(--heads); font-weight:600; font-size:22px;
+    letter-spacing:.22em; text-transform:uppercase;
+  }
+  .dreams-head .tag{
+    font-family:var(--mono); font-size:9.5px; color:var(--faint);
+    letter-spacing:.14em; text-transform:uppercase;
+  }
+  .dreams-head button{ margin-left:auto; }
+  .dream-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr));
+    gap:18px;
+  }
+  .dream-card{
+    background:var(--panel); border:1px solid var(--line-soft);
+    border-radius:var(--radius); overflow:hidden; cursor:pointer;
+    transition:border-color .15s, transform .15s;
+  }
+  .dream-card:hover{ border-color:var(--line); transform:translateY(-2px); }
+  .dream-cover{
+    height:150px; background-size:cover; background-position:center;
+    background-color:var(--bg-deep);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .dream-cover.blank{
+    display:grid; place-items:center;
+    background:radial-gradient(ellipse at 50% 40%, #1e2229, var(--bg-deep));
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    letter-spacing:.2em; text-transform:uppercase;
+  }
+  .dream-body{ padding:12px 14px 14px; }
+  .dream-body .dt{ font-family:var(--heads); font-weight:500; font-size:15.5px; letter-spacing:.06em; }
+  .dream-chips{ display:flex; gap:5px; margin-top:8px; flex-wrap:wrap; }
+  .chip.vital{ color:var(--red); border-color:rgba(212,53,59,.4); }
+  .chip.high{ color:var(--gold); border-color:rgba(200,162,75,.4); }
+  .chip.achieved{ color:var(--gold); border-color:rgba(200,162,75,.4); }
+  .chip.underway{ color:#7da2c1; border-color:rgba(125,162,193,.35); }
+  .dream-bar{
+    height:4px; background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-radius:2px; overflow:hidden; margin-top:11px;
+  }
+  .dream-bar i{ display:block; height:100%; background:linear-gradient(90deg,var(--red-dim),var(--red)); }
+  .dream-meta{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    letter-spacing:.08em; margin-top:8px; display:flex; justify-content:space-between; gap:8px;
+  }
+  .dream-meta b{ color:var(--muted); font-weight:500; }
+
+  /* ---------- dream modal ---------- */
+  .scrim{
+    position:fixed; inset:0; z-index:100;
+    background:rgba(10,12,14,.78); backdrop-filter:blur(4px);
+    display:grid; place-items:center; padding:20px; overflow-y:auto;
+  }
+  .modal{
+    width:min(540px, 100%); max-height:92vh; overflow-y:auto;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius);
+  }
+  .modal-cover{
+    height:230px; background-size:cover; background-position:center;
+    background-color:var(--bg-deep); position:relative;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .modal-cover .up{
+    position:absolute; right:10px; bottom:10px;
+    font-size:9px; padding:6px 11px; background:rgba(15,17,19,.8);
+  }
+  .modal-body{ padding:18px; }
+  .f-label{
+    font-family:var(--mono); font-size:8.5px; color:var(--faint);
+    letter-spacing:.16em; text-transform:uppercase;
+    display:block; margin:12px 0 5px;
+  }
+  .f-label:first-child{ margin-top:0; }
+  .f-grid{ display:grid; grid-template-columns:1fr 1fr; gap:0 12px; }
+  .modal-actions{
+    display:flex; gap:8px; margin-top:18px; align-items:center;
+  }
+  .modal-actions .msg{
+    font-family:var(--mono); font-size:9px; color:var(--red); letter-spacing:.08em;
+  }
+  .modal-actions .grow{ flex:1; }
+
   /* ---------- the ledger (expenses) ---------- */
   .exp-sum{
     display:flex; justify-content:space-between;
@@ -476,6 +571,10 @@
     <b>The Sanctum</b>
     <span>Personal CRM · Second Brain</span>
   </div>
+  <nav class="views" aria-label="Pages">
+    <button class="view-btn active" data-view="dash">Command</button>
+    <button class="view-btn" data-view="dreams">Dreams</button>
+  </nav>
   <div class="head-spacer"></div>
   <div class="clock">
     <b id="clock-time">--:--</b><br>
@@ -485,6 +584,7 @@
 </header>
 
 <div class="wrap">
+  <div id="view-dash">
   <section class="front" aria-label="The oath and the year">
     <div class="front-year" id="year-body"></div>
     <div class="front-stats">
@@ -650,6 +750,15 @@
       </section>
     </div>
   </div>
+  </div>
+
+  <div id="view-dreams" hidden>
+    <div class="dreams-head">
+      <h2>Dreams</h2><span class="tag">What the war chest is for — goals, wants, acquisitions</span>
+      <button class="primary" id="dream-new">+ New dream</button>
+    </div>
+    <div class="dream-grid" id="dream-grid"></div>
+  </div>
 
   <footer>
     <div class="io">
@@ -675,7 +784,7 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [] };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [] };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -684,11 +793,16 @@
   if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
   if (!Array.isArray(db.inbox)) db.inbox = [];
   if (!Array.isArray(db.expenses)) db.expenses = [];
+  if (!Array.isArray(db.dreams)) db.dreams = [];
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
     delete db.vow;
   }
-  const save = () => localStorage.setItem(KEY, JSON.stringify(db));
+  const save = () => {
+    try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
+    catch (e) { return false; }
+  };
+  const rupee = n => '₹' + (n || 0).toLocaleString('en-IN');
 
   /* ---------- clock & watch ---------- */
   function tickClock() {
@@ -1114,6 +1228,165 @@
   $('exp-note').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
   $('exp-amt').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
 
+  /* ---------- view switching ---------- */
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b === btn));
+      $('view-dash').hidden = btn.dataset.view !== 'dash';
+      $('view-dreams').hidden = btn.dataset.view !== 'dreams';
+      window.scrollTo(0, 0);
+    };
+  });
+
+  /* ---------- dreams (vision board) ---------- */
+  const DREAM_STATUS = { planned: 'Planned', underway: 'Underway', achieved: 'Achieved' };
+  const DREAM_PRIO = { vital: 'Vital', high: 'High', medium: 'Medium', low: 'Low' };
+
+  function renderDreams() {
+    const grid = $('dream-grid');
+    grid.innerHTML = db.dreams.length ? '' :
+      '<div class="empty" style="grid-column:1/-1;padding:60px 0">Nothing here yet. Add the first thing worth fighting for.</div>';
+    db.dreams.forEach(d => {
+      const card = document.createElement('div');
+      card.className = 'dream-card';
+      const pct = d.price > 0 ? Math.min(100, Math.round((d.saved / d.price) * 100)) : null;
+      card.innerHTML =
+        (d.img
+          ? '<div class="dream-cover" style="background-image:url(' + d.img + ')"></div>'
+          : '<div class="dream-cover blank">No image yet</div>') +
+        '<div class="dream-body">' +
+          '<div class="dt">' + esc(d.title) + '</div>' +
+          '<div class="dream-chips">' +
+            '<span class="chip ' + d.prio + '">' + DREAM_PRIO[d.prio] + '</span>' +
+            '<span class="chip ' + d.status + '">' + DREAM_STATUS[d.status] + '</span>' +
+          '</div>' +
+          (pct !== null
+            ? '<div class="dream-bar"><i style="width:' + pct + '%"></i></div>' +
+              '<div class="dream-meta"><span><b>' + rupee(d.saved) + '</b> of ' + rupee(d.price) + ' · <b>' + pct + '%</b></span>' +
+              (d.date ? '<span>BY ' + shortDate(d.date) + '</span>' : '') + '</div>'
+            : (d.date ? '<div class="dream-meta"><span>BY ' + shortDate(d.date) + '</span></div>' : '')) +
+        '</div>';
+      card.onclick = () => openDream(d.id);
+      grid.appendChild(card);
+    });
+  }
+
+  function shrinkImage(file, cb) {
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 640;
+        const scale = Math.min(1, MAX / img.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        cb(c.toDataURL('image/jpeg', 0.72));
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  }
+
+  function openDream(id) {
+    const d = id ? db.dreams.find(x => x.id === id) : null;
+    let img = d ? d.img : null;
+
+    const scrim = document.createElement('div');
+    scrim.className = 'scrim';
+    scrim.innerHTML =
+      '<div class="modal">' +
+        '<div class="modal-cover' + (img ? '' : ' dream-cover blank') + '"' + (img ? ' style="background-image:url(' + img + ')"' : '') + '>' +
+          (img ? '' : 'No image yet') +
+          '<button class="up">Upload image</button>' +
+          '<input type="file" accept="image/*" hidden>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<label class="f-label">What is it</label>' +
+          '<input id="dm-title" placeholder="Royal Enfield, Macbook, Ladakh trip…" value="' + (d ? esc(d.title).replace(/"/g, '&quot;') : '') + '">' +
+          '<div class="f-grid">' +
+            '<div><label class="f-label">Costs (₹)</label><input id="dm-price" type="number" min="0" value="' + (d && d.price ? d.price : '') + '"></div>' +
+            '<div><label class="f-label">Saved so far (₹)</label><input id="dm-saved" type="number" min="0" value="' + (d && d.saved ? d.saved : '') + '"></div>' +
+            '<div><label class="f-label">Target date</label><input id="dm-date" type="date" value="' + (d && d.date ? d.date : '') + '"></div>' +
+            '<div><label class="f-label">Priority</label><select id="dm-prio" style="width:100%">' +
+              Object.entries(DREAM_PRIO).map(([v, l]) => '<option value="' + v + '"' + (d && d.prio === v ? ' selected' : '') + '>' + l.toUpperCase() + '</option>').join('') +
+            '</select></div>' +
+          '</div>' +
+          '<label class="f-label">Status</label>' +
+          '<select id="dm-status" style="width:100%">' +
+            Object.entries(DREAM_STATUS).map(([v, l]) => '<option value="' + v + '"' + (d && d.status === v ? ' selected' : '') + '>' + l.toUpperCase() + '</option>').join('') +
+          '</select>' +
+          '<label class="f-label">Notes</label>' +
+          '<textarea id="dm-notes" placeholder="Why this matters, model, plan…">' + (d && d.notes ? esc(d.notes) : '') + '</textarea>' +
+          '<div class="modal-actions">' +
+            '<button class="primary" id="dm-save">' + (d ? 'Save' : 'Add dream') + '</button>' +
+            (d ? '<button id="dm-del">Delete</button>' : '') +
+            '<span class="msg" id="dm-msg"></span>' +
+            '<span class="grow"></span>' +
+            '<button id="dm-close">Close</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(scrim);
+
+    const cover = scrim.querySelector('.modal-cover');
+    const fileInput = scrim.querySelector('input[type=file]');
+    scrim.querySelector('.up').onclick = () => fileInput.click();
+    fileInput.onchange = e => {
+      const f = e.target.files[0]; if (!f) return;
+      shrinkImage(f, url => {
+        img = url;
+        cover.classList.remove('blank');
+        cover.style.backgroundImage = 'url(' + url + ')';
+        cover.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = ''; });
+      });
+    };
+
+    const close = () => scrim.remove();
+    scrim.querySelector('#dm-close').onclick = close;
+    scrim.addEventListener('click', e => { if (e.target === scrim) close(); });
+    document.addEventListener('keydown', function esc1(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc1); }
+    });
+
+    scrim.querySelector('#dm-save').onclick = () => {
+      const title = scrim.querySelector('#dm-title').value.trim();
+      if (!title) { scrim.querySelector('#dm-msg').textContent = 'GIVE IT A NAME'; return; }
+      const rec = {
+        id: d ? d.id : uid(),
+        title,
+        img,
+        price: parseInt(scrim.querySelector('#dm-price').value, 10) || 0,
+        saved: parseInt(scrim.querySelector('#dm-saved').value, 10) || 0,
+        date: scrim.querySelector('#dm-date').value || null,
+        prio: scrim.querySelector('#dm-prio').value,
+        status: scrim.querySelector('#dm-status').value
+      };
+      rec.notes = scrim.querySelector('#dm-notes').value.trim();
+      if (d) Object.assign(d, rec); else db.dreams.unshift(rec);
+      if (!save()) {
+        if (!d) db.dreams.shift();
+        scrim.querySelector('#dm-msg').textContent = 'STORAGE FULL — TRY A SMALLER IMAGE';
+        return;
+      }
+      renderDreams(); close();
+    };
+
+    const del = scrim.querySelector('#dm-del');
+    if (del) del.onclick = () => {
+      if (del.dataset.armed) {
+        db.dreams = db.dreams.filter(x => x.id !== d.id);
+        save(); renderDreams(); close();
+      } else {
+        del.dataset.armed = '1';
+        del.textContent = 'Sure? Tap again';
+        del.style.borderColor = 'var(--red)'; del.style.color = 'var(--red)';
+      }
+    };
+  }
+  $('dream-new').onclick = () => openDream(null);
+
   /* ---------- export / import ---------- */
   $('export-btn').onclick = () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
@@ -1130,11 +1403,12 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [] }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [] }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
         if (!Array.isArray(db.expenses)) db.expenses = [];
+        if (!Array.isArray(db.dreams)) db.dreams = [];
         save(); renderAll();
       } catch (err) { alert('That file is not a valid Sanctum backup.'); }
     };
@@ -1143,7 +1417,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderInbox(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderStats();
+    renderTasks(); renderInbox(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderStats();
   }
   renderAll();
 })();
