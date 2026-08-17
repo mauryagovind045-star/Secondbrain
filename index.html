@@ -395,6 +395,33 @@
   .vow-foot .vbtn.danger-armed{ border-color:var(--red); color:var(--red); }
   @media (prefers-reduced-motion: reduce){ .vc.today{ animation:none; } }
 
+  /* ---------- the ledger (expenses) ---------- */
+  .exp-sum{
+    display:flex; justify-content:space-between;
+    margin:12px 0 10px; padding:9px 11px;
+    background:var(--bg-deep); border:1px solid var(--line-soft); border-radius:3px;
+    font-family:var(--mono); font-size:9.5px; color:var(--faint);
+    letter-spacing:.12em; text-transform:uppercase;
+  }
+  .exp-sum b{ color:var(--text); font-weight:500; }
+  .exp-item{
+    display:flex; align-items:center; gap:8px;
+    padding:7px 2px; border-bottom:1px solid var(--line-soft);
+  }
+  .exp-item:last-child{ border-bottom:none; }
+  .exp-item .when{
+    font-family:var(--mono); font-size:8.5px; color:var(--faint);
+    letter-spacing:.06em; flex:none; width:44px;
+  }
+  .exp-item .txt{ flex:1; font-size:13px; min-width:0; overflow-wrap:break-word; }
+  .exp-item .cat{
+    font-family:var(--mono); font-size:8px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--faint); flex:none;
+  }
+  .exp-item .amt{
+    font-family:var(--mono); font-size:11.5px; color:var(--text); flex:none;
+  }
+
   .empty{
     font-family:var(--mono); font-size:10.5px; color:var(--faint);
     letter-spacing:.12em; text-transform:uppercase;
@@ -582,6 +609,31 @@
           <ul class="list" id="note-list" style="margin-top:12px"></ul>
         </div>
       </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>The Ledger</h2><span class="tag">Daily expenses</span>
+          <span class="count" id="exp-today">₹0 today</span>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <input id="exp-amt" type="number" min="0" placeholder="₹" aria-label="Amount" style="max-width:90px">
+            <input id="exp-note" placeholder="What was it for?" aria-label="Expense note">
+          </div>
+          <div class="row">
+            <select id="exp-cat" aria-label="Category">
+              <option value="food">FOOD</option>
+              <option value="travel">TRAVEL</option>
+              <option value="bills">BILLS</option>
+              <option value="fun">FUN</option>
+              <option value="other">OTHER</option>
+            </select>
+            <button class="primary" id="exp-add" style="flex:1">Log it</button>
+          </div>
+          <div class="exp-sum" id="exp-sum"></div>
+          <ul class="list" id="exp-list"></ul>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -609,7 +661,7 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [] };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [] };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -617,6 +669,7 @@
   if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
   if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
   if (!Array.isArray(db.inbox)) db.inbox = [];
+  if (!Array.isArray(db.expenses)) db.expenses = [];
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
     delete db.vow;
@@ -983,6 +1036,52 @@
     $('year-earned').addEventListener('keydown', e => { if (e.key === 'Enter') $('year-set').click(); });
   }
 
+  /* ---------- the ledger (expenses) ---------- */
+  function renderExpenses() {
+    const fmtR = n => '₹' + n.toLocaleString('en-IN');
+    const today = todayKey();
+    const month = today.slice(0, 7);
+    const todayTotal = db.expenses.filter(e => e.date === today).reduce((s, e) => s + e.amt, 0);
+    const monthTotal = db.expenses.filter(e => e.date.slice(0, 7) === month).reduce((s, e) => s + e.amt, 0);
+
+    $('exp-today').textContent = fmtR(todayTotal) + ' today';
+    $('exp-sum').innerHTML =
+      '<span>TODAY <b>' + fmtR(todayTotal) + '</b></span>' +
+      '<span>THIS MONTH <b>' + fmtR(monthTotal) + '</b></span>';
+
+    const ul = $('exp-list');
+    ul.innerHTML = db.expenses.length ? '' : '<div class="empty">Nothing logged. Every rupee gets counted.</div>';
+    db.expenses.slice(0, 30).forEach(e => {
+      const li = document.createElement('li');
+      li.className = 'exp-item';
+      li.innerHTML =
+        '<span class="when">' + shortDate(e.date) + '</span>' +
+        '<span class="txt">' + esc(e.note || '—') + '</span>' +
+        '<span class="cat">' + e.cat + '</span>' +
+        '<span class="amt">' + fmtR(e.amt) + '</span>' +
+        '<button class="ghost" aria-label="Delete expense">✕</button>';
+      li.querySelector('.ghost').onclick = () => {
+        db.expenses = db.expenses.filter(x => x.id !== e.id);
+        save(); renderExpenses();
+      };
+      ul.appendChild(li);
+    });
+    if (db.expenses.length > 30) {
+      ul.insertAdjacentHTML('beforeend',
+        '<div class="empty">+ ' + (db.expenses.length - 30) + ' older entries kept in the vault</div>');
+    }
+  }
+  function addExpense() {
+    const amt = parseInt($('exp-amt').value, 10);
+    if (isNaN(amt) || amt <= 0) return;
+    db.expenses.unshift({ id: uid(), amt, note: $('exp-note').value.trim(), cat: $('exp-cat').value, date: todayKey() });
+    $('exp-amt').value = ''; $('exp-note').value = '';
+    save(); renderExpenses();
+  }
+  $('exp-add').onclick = addExpense;
+  $('exp-note').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
+  $('exp-amt').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
+
   /* ---------- export / import ---------- */
   $('export-btn').onclick = () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
@@ -999,10 +1098,11 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [] }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [] }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
+        if (!Array.isArray(db.expenses)) db.expenses = [];
         save(); renderAll();
       } catch (err) { alert('That file is not a valid Sanctum backup.'); }
     };
@@ -1011,7 +1111,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderInbox(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderStats();
+    renderTasks(); renderInbox(); renderPeople(); renderNotes(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderStats();
   }
   renderAll();
 })();
