@@ -273,6 +273,12 @@
   }
   .chip.work{ color:var(--gold); border-color:rgba(200,162,75,.35); }
   .chip.life{ color:#7da2c1; border-color:rgba(125,162,193,.35); }
+  .due{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.08em;
+    color:var(--faint); flex:none; white-space:nowrap;
+  }
+  .due.today{ color:var(--gold); }
+  .due.over{ color:var(--red); }
 
   /* ---------- inbox ---------- */
   .inbox-item{
@@ -633,6 +639,7 @@
             <input id="task-input" placeholder="New mission…" aria-label="New task">
           </div>
           <div class="row">
+            <input id="task-due" type="date" aria-label="Due date" title="Due date (optional)" style="max-width:135px">
             <select id="task-sphere" aria-label="Task sphere">
               <option value="work">WORK</option>
               <option value="life">LIFE</option>
@@ -640,9 +647,9 @@
             <button class="primary" id="task-add" style="flex:1">Deploy</button>
           </div>
           <div class="filters" style="margin-top:12px" id="task-filters">
-            <button data-f="all" class="active">All</button>
-            <button data-f="work">Work</button>
-            <button data-f="life">Life</button>
+            <button data-f="today" class="active">Today</button>
+            <button data-f="week">7 days</button>
+            <button data-f="all">All</button>
             <button data-f="done">Done</button>
           </div>
           <ul class="list" id="task-list"></ul>
@@ -808,6 +815,14 @@
   };
   const rupee = n => '₹' + (n || 0).toLocaleString('en-IN');
 
+  /* ---------- date fields open their calendar on click ---------- */
+  document.addEventListener('click', e => {
+    const el = e.target;
+    if (el && el.matches && el.matches('input[type="date"]')) {
+      try { el.showPicker(); } catch (err) { /* icon still works */ }
+    }
+  });
+
   /* ---------- clock & watch ---------- */
   function tickClock() {
     const now = new Date();
@@ -832,22 +847,35 @@
   }
 
   /* ---------- missions ---------- */
-  let taskFilter = 'all';
+  let taskFilter = 'today';
+  const dayDiff = iso => Math.round((new Date(iso) - new Date(todayKey())) / 864e5);
+  function dueChip(t) {
+    if (!t.due || t.done) return '';
+    const d = dayDiff(t.due);
+    if (d < 0)  return '<span class="due over">OVER ' + (-d) + 'D</span>';
+    if (d === 0) return '<span class="due today">TODAY</span>';
+    if (d === 1) return '<span class="due">TMRW</span>';
+    return '<span class="due">' + shortDate(t.due).toUpperCase() + '</span>';
+  }
   function renderTasks() {
     const ul = $('task-list');
+    const inDays = (t, n) => !t.due || dayDiff(t.due) <= n;
     const shown = db.tasks.filter(t =>
-      taskFilter === 'all'  ? !t.done :
-      taskFilter === 'done' ? t.done  :
-      (t.sphere === taskFilter && !t.done)
-    );
+      taskFilter === 'done'  ? t.done :
+      taskFilter === 'all'   ? !t.done :
+      taskFilter === 'today' ? (!t.done && inDays(t, 0)) :
+                               (!t.done && inDays(t, 7))
+    ).sort((a, b) => (a.done ? 0 : (a.due || '9999').localeCompare(b.due || '9999')));
     $('task-count').textContent = db.tasks.filter(t => !t.done).length + ' open';
-    ul.innerHTML = shown.length ? '' : '<div class="empty">No open missions.</div>';
+    ul.innerHTML = shown.length ? '' :
+      '<div class="empty">' + (taskFilter === 'today' ? 'Nothing due today. Well held.' : 'No missions here.') + '</div>';
     shown.forEach(t => {
       const li = document.createElement('li');
       li.className = 'task' + (t.done ? ' done' : '');
       li.innerHTML =
         '<button class="check" aria-label="Toggle done"><svg viewBox="0 0 16 16"><path d="M2 8l4 4 8-8"/></svg></button>' +
         '<span class="txt">' + esc(t.text) + '</span>' +
+        dueChip(t) +
         '<span class="chip ' + t.sphere + '">' + t.sphere + '</span>' +
         '<button class="ghost" aria-label="Delete task">✕</button>';
       li.querySelector('.check').onclick = () => {
@@ -865,8 +893,8 @@
   function addTask() {
     const v = $('task-input').value.trim();
     if (!v) return;
-    db.tasks.unshift({ id: uid(), text: v, sphere: $('task-sphere').value, done: false, doneOn: null });
-    $('task-input').value = '';
+    db.tasks.unshift({ id: uid(), text: v, sphere: $('task-sphere').value, due: $('task-due').value || null, done: false, doneOn: null });
+    $('task-input').value = ''; $('task-due').value = '';
     save(); renderTasks(); renderStats();
   }
   $('task-add').onclick = addTask;
@@ -1326,11 +1354,6 @@
         '</div>' +
       '</div>';
     document.body.appendChild(scrim);
-
-    const dateInput = scrim.querySelector('#dm-date');
-    dateInput.addEventListener('click', () => {
-      try { dateInput.showPicker(); } catch (e) { /* browser without showPicker — icon still works */ }
-    });
 
     const cover = scrim.querySelector('.modal-cover');
     const fileInput = scrim.querySelector('input[type=file]');
