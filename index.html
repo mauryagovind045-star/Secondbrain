@@ -980,6 +980,7 @@
     const open = db.tasks.filter(t => !t.done);
     const todayN = open.filter(t => !t.due || dayDiff(t.due) <= 0).length;
     const TABS = [
+      ['inbox', 'Inbox' + (db.inbox.length ? ' · ' + db.inbox.length : '')],
       ['today', 'Today' + (todayN ? ' · ' + todayN : '')],
       ['tmrw', 'Tomorrow'], ['week', '7 days'], ['someday', 'Someday'],
       ['all', 'All'], ['done', 'Done']
@@ -1004,6 +1005,18 @@
       box.appendChild(ul);
     };
 
+    if (pageTab === 'inbox') {
+      const h = document.createElement('div');
+      h.className = 'tgroup';
+      h.textContent = 'Captured — sort into missions';
+      box.appendChild(h);
+      const ul = document.createElement('ul');
+      ul.className = 'list';
+      db.inbox.forEach(it => ul.appendChild(inboxRow(it)));
+      box.appendChild(ul);
+      if (!db.inbox.length) box.innerHTML = '<div class="empty" style="padding:40px 0">Inbox is clear.</div>';
+      return;
+    }
     if (pageTab === 'today') {
       addGroup('Overdue', open.filter(t => t.due && dayDiff(t.due) < 0), true);
       addGroup('Due today', open.filter(t => t.due && dayDiff(t.due) === 0));
@@ -1044,6 +1057,28 @@
 
   /* ---------- inbox ---------- */
   let inboxOpen = false;
+  function refreshInbox() { renderInbox(); renderTasksPage(); }
+  function inboxRow(it) {
+    const li = document.createElement('li');
+    li.className = 'inbox-item';
+    li.innerHTML =
+      '<span class="txt">' + esc(it.text) + '</span>' +
+      '<button class="mv w" title="Move to Missions as WORK">→ WORK</button>' +
+      '<button class="mv l" title="Move to Missions as LIFE">→ LIFE</button>' +
+      '<button class="ghost" aria-label="Delete">✕</button>';
+    const moveTo = sphere => {
+      db.tasks.unshift({ id: uid(), text: it.text, sphere, prio: 'med', due: null, done: false, doneOn: null });
+      db.inbox = db.inbox.filter(x => x.id !== it.id);
+      save(); refreshInbox(); renderTasks(); renderStats();
+    };
+    li.querySelector('.w').onclick = () => moveTo('work');
+    li.querySelector('.l').onclick = () => moveTo('life');
+    li.querySelector('.ghost').onclick = () => {
+      db.inbox = db.inbox.filter(x => x.id !== it.id);
+      save(); refreshInbox();
+    };
+    return li;
+  }
   function renderInbox() {
     const ul = $('inbox-list');
     const n = db.inbox.length;
@@ -1065,34 +1100,14 @@
     ul.parentNode.insertBefore(t, ul);
     if (!inboxOpen) return;
 
-    db.inbox.forEach(it => {
-      const li = document.createElement('li');
-      li.className = 'inbox-item';
-      li.innerHTML =
-        '<span class="txt">' + esc(it.text) + '</span>' +
-        '<button class="mv w" title="Move to Missions as WORK">→ WORK</button>' +
-        '<button class="mv l" title="Move to Missions as LIFE">→ LIFE</button>' +
-        '<button class="ghost" aria-label="Delete">✕</button>';
-      const moveTo = sphere => {
-        db.tasks.unshift({ id: uid(), text: it.text, sphere, done: false, doneOn: null });
-        db.inbox = db.inbox.filter(x => x.id !== it.id);
-        save(); renderInbox(); renderTasks(); renderStats();
-      };
-      li.querySelector('.w').onclick = () => moveTo('work');
-      li.querySelector('.l').onclick = () => moveTo('life');
-      li.querySelector('.ghost').onclick = () => {
-        db.inbox = db.inbox.filter(x => x.id !== it.id);
-        save(); renderInbox();
-      };
-      ul.appendChild(li);
-    });
+    db.inbox.forEach(it => ul.appendChild(inboxRow(it)));
   }
   function addInbox() {
     const v = $('inbox-input').value.trim();
     if (!v) return;
     db.inbox.unshift({ id: uid(), text: v });
     $('inbox-input').value = '';
-    save(); renderInbox();
+    save(); refreshInbox();
   }
   $('inbox-add').onclick = addInbox;
   $('inbox-input').addEventListener('keydown', e => { if (e.key === 'Enter') addInbox(); });
