@@ -743,6 +743,7 @@
             <input id="exp-note" placeholder="What was it for?" aria-label="Expense note">
           </div>
           <div class="row">
+            <input id="exp-date" type="date" aria-label="Expense date" title="Date (leave empty for today)" style="max-width:135px">
             <select id="exp-cat" aria-label="Category">
               <option value="personal">PERSONAL</option>
               <option value="diet">DIET</option>
@@ -1357,8 +1358,9 @@
   function addExpense() {
     const amt = parseInt($('exp-amt').value, 10);
     if (isNaN(amt) || amt <= 0) return;
-    db.expenses.unshift({ id: uid(), amt, note: $('exp-note').value.trim(), cat: $('exp-cat').value, date: todayKey() });
-    $('exp-amt').value = ''; $('exp-note').value = '';
+    db.expenses.unshift({ id: uid(), amt, note: $('exp-note').value.trim(), cat: $('exp-cat').value, date: $('exp-date').value || todayKey() });
+    db.expenses.sort((a, b) => b.date.localeCompare(a.date));
+    $('exp-amt').value = ''; $('exp-note').value = ''; $('exp-date').value = '';
     save(); renderExpenses();
   }
   $('exp-add').onclick = addExpense;
