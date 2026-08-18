@@ -471,6 +471,19 @@
     font-family:var(--mono); font-size:9px; color:var(--faint);
     letter-spacing:.2em; text-transform:uppercase;
   }
+  .dream-card{ position:relative; }
+  .dream-card.won{ border-color:rgba(200,162,75,.5); }
+  .dream-card.won:hover{ border-color:var(--gold); }
+  .won-tag{
+    position:absolute; top:10px; right:10px;
+    font-family:var(--heads); font-weight:600; font-size:10.5px;
+    letter-spacing:.24em; text-transform:uppercase;
+    color:var(--gold); background:rgba(15,17,19,.85);
+    border:1px solid rgba(200,162,75,.5); border-radius:2px;
+    padding:5px 9px 4px;
+  }
+  .dream-chips .chip.st{ cursor:pointer; }
+  .dream-chips .chip.st:hover{ border-color:var(--faint); }
   .dream-body{ padding:12px 14px 14px; }
   .dream-body .dt{ font-family:var(--heads); font-weight:500; font-size:15.5px; letter-spacing:.06em; }
   .dream-chips{ display:flex; gap:5px; margin-top:8px; flex-wrap:wrap; }
@@ -1398,11 +1411,14 @@
     const grid = $('dream-grid');
     grid.innerHTML = db.dreams.length ? '' :
       '<div class="empty" style="grid-column:1/-1;padding:60px 0">Nothing here yet. Add the first thing worth fighting for.</div>';
+    const NEXT_STATUS = { planned: 'underway', underway: 'achieved', achieved: 'planned' };
     db.dreams.forEach(d => {
       const card = document.createElement('div');
-      card.className = 'dream-card';
+      const won = d.status === 'achieved';
+      card.className = 'dream-card' + (won ? ' won' : '');
       const pct = d.price > 0 ? Math.min(100, Math.round((d.saved / d.price) * 100)) : null;
       card.innerHTML =
+        (won ? '<span class="won-tag">✦ Achieved</span>' : '') +
         (d.img
           ? '<div class="dream-cover" style="background-image:url(' + d.img + ')"></div>'
           : '<div class="dream-cover blank">No image yet</div>') +
@@ -1410,7 +1426,7 @@
           '<div class="dt">' + esc(d.title) + '</div>' +
           '<div class="dream-chips">' +
             '<span class="chip ' + d.prio + '">' + DREAM_PRIO[d.prio] + '</span>' +
-            '<span class="chip ' + d.status + '">' + DREAM_STATUS[d.status] + '</span>' +
+            '<span class="chip st ' + d.status + '" title="Click to update status">' + DREAM_STATUS[d.status] + '</span>' +
           '</div>' +
           (pct !== null
             ? '<div class="dream-bar"><i style="width:' + pct + '%"></i></div>' +
@@ -1419,6 +1435,11 @@
             : (d.date ? '<div class="dream-meta"><span>BY ' + shortDate(d.date) + '</span></div>' : '')) +
         '</div>';
       card.onclick = () => openDream(d.id);
+      card.querySelector('.chip.st').onclick = e => {
+        e.stopPropagation();
+        d.status = NEXT_STATUS[d.status] || 'planned';
+        save(); renderDreams();
+      };
       grid.appendChild(card);
     });
   }
