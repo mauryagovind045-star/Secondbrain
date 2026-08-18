@@ -744,20 +744,7 @@
           </div>
           <div class="row">
             <input id="exp-date" type="date" aria-label="Expense date" title="Date (leave empty for today)" style="max-width:135px">
-            <select id="exp-cat" aria-label="Category">
-              <option value="personal">PERSONAL</option>
-              <option value="diet">DIET</option>
-              <option value="eatout">EAT OUT</option>
-              <option value="shopping">SHOPPING</option>
-              <option value="grocery">GROCERY</option>
-              <option value="home">HOME</option>
-              <option value="fuel">FUEL</option>
-              <option value="learning">LEARNING</option>
-              <option value="emi">EMI</option>
-              <option value="sutta">SUTTA</option>
-              <option value="business">BUSINESS</option>
-              <option value="misc">MISC</option>
-            </select>
+            <select id="exp-cat" class="cat-select" aria-label="Category"></select>
             <button class="primary" id="exp-add" style="flex:1">Log it</button>
           </div>
           <div class="exp-sum" id="exp-sum"></div>
@@ -806,6 +793,13 @@
     <div class="ledger-wrap">
       <div class="dreams-head">
         <h2>The Ledger</h2><span class="tag">Every rupee, all of it</span>
+      </div>
+      <div class="row" style="flex-wrap:wrap; margin-bottom:14px">
+        <input id="lg-amt" type="number" min="0" placeholder="₹" aria-label="Amount" style="max-width:110px">
+        <input id="lg-note" placeholder="What was it for?" aria-label="Expense note" style="flex:1; min-width:180px">
+        <input id="lg-date" type="date" aria-label="Expense date" title="Date (leave empty for today)" style="max-width:140px">
+        <select id="lg-cat" class="cat-select" aria-label="Category"></select>
+        <button class="primary" id="lg-add">Log it</button>
       </div>
       <div class="exp-sum" id="ledger-sum"></div>
       <div class="cat-row" id="ledger-cats"></div>
@@ -1307,6 +1301,14 @@
   }
 
   /* ---------- the ledger (expenses) ---------- */
+  const CATS = {
+    personal: 'PERSONAL', diet: 'DIET', eatout: 'EAT OUT', shopping: 'SHOPPING',
+    grocery: 'GROCERY', home: 'HOME', fuel: 'FUEL', learning: 'LEARNING',
+    emi: 'EMI', sutta: 'SUTTA', business: 'BUSINESS', misc: 'MISC'
+  };
+  document.querySelectorAll('select.cat-select').forEach(s => {
+    s.innerHTML = Object.entries(CATS).map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
+  });
   function renderExpenses() {
     const today = todayKey();
     const month = today.slice(0, 7);
@@ -1355,17 +1357,19 @@
     });
   }
   $('exp-open').onclick = () => showView('ledger');
-  function addExpense() {
-    const amt = parseInt($('exp-amt').value, 10);
+  function addExpense(p) {
+    const amt = parseInt($(p + '-amt').value, 10);
     if (isNaN(amt) || amt <= 0) return;
-    db.expenses.unshift({ id: uid(), amt, note: $('exp-note').value.trim(), cat: $('exp-cat').value, date: $('exp-date').value || todayKey() });
+    db.expenses.unshift({ id: uid(), amt, note: $(p + '-note').value.trim(), cat: $(p + '-cat').value, date: $(p + '-date').value || todayKey() });
     db.expenses.sort((a, b) => b.date.localeCompare(a.date));
-    $('exp-amt').value = ''; $('exp-note').value = ''; $('exp-date').value = '';
+    $(p + '-amt').value = ''; $(p + '-note').value = ''; $(p + '-date').value = '';
     save(); renderExpenses();
   }
-  $('exp-add').onclick = addExpense;
-  $('exp-note').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
-  $('exp-amt').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
+  ['exp', 'lg'].forEach(p => {
+    $(p + '-add').onclick = () => addExpense(p);
+    $(p + '-note').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(p); });
+    $(p + '-amt').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(p); });
+  });
 
   /* ---------- vows fold ---------- */
   const vowsFold = $('vows-fold');
