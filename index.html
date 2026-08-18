@@ -923,7 +923,8 @@
       dueChip(t) +
       (t.done ? '' : '<span class="chip p-' + prioOf(t) + '" title="Click to change priority">' + prioOf(t) + '</span>') +
       '<span class="chip ' + t.sphere + '">' + t.sphere + '</span>' +
-      '<button class="ghost" aria-label="Delete task">✕</button>';
+      (t.done ? '' : '<button class="ghost push" title="Push to tomorrow" aria-label="Push to tomorrow">»</button>') +
+      '<button class="ghost del" aria-label="Delete task">✕</button>';
     li.querySelector('.check').onclick = () => {
       t.done = !t.done;
       t.doneOn = t.done ? todayKey() : null;
@@ -931,7 +932,13 @@
     };
     const pchip = li.querySelector('.chip.p-' + prioOf(t));
     if (pchip) pchip.onclick = () => { t.prio = PRIO_NEXT[prioOf(t)]; save(); refreshTasks(); };
-    li.querySelector('.ghost').onclick = () => {
+    const push = li.querySelector('.push');
+    if (push) push.onclick = () => {
+      const d = new Date(); d.setDate(d.getDate() + 1);
+      t.due = todayKey(d);
+      save(); refreshTasks();
+    };
+    li.querySelector('.del').onclick = () => {
       db.tasks = db.tasks.filter(x => x.id !== t.id);
       save(); refreshTasks();
     };
