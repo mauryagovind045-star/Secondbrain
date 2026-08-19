@@ -561,6 +561,16 @@
     font-family:var(--mono); font-size:9px; color:var(--red); letter-spacing:.08em;
   }
   .modal-actions .grow{ flex:1; }
+  .modal a{ color:var(--gold); }
+  .sync-note{
+    font-size:12.5px; color:var(--muted); line-height:1.55; margin-top:8px;
+  }
+  .sync-status{
+    font-family:var(--mono); font-size:9.5px; color:var(--faint);
+    letter-spacing:.1em; text-transform:uppercase; margin-top:10px;
+  }
+  .sync-status.ok{ color:var(--ok); }
+  .sync-status.err{ color:var(--red); }
 
   /* ---------- the ledger (expenses) ---------- */
   .exp-sum{
@@ -846,6 +856,7 @@
 
   <footer>
     <div class="io">
+      <button id="sync-btn">☁ Sync</button>
       <button id="export-btn">Export vault</button>
       <button id="import-btn">Import vault</button>
       <input type="file" id="import-file" accept=".json" hidden>
@@ -1648,6 +1659,131 @@
     };
   }
   $('dream-new').onclick = () => openDream(null);
+
+  /* ---------- cloud sync (private gist) ---------- */
+  const SYNC_KEY = 'sanctum.sync';
+  const GIST_FILE = 'sanctum-vault.json';
+  const GIST_DESC = 'The Sanctum vault — private sync (do not edit)';
+  let sync = null;
+  try { sync = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); } catch (e) {}
+  const saveSync = () => localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+
+  async function gh(path, opts) {
+    const r = await fetch('https://api.github.com' + path, Object.assign({}, opts || {}, {
+      headers: { 'Authorization': 'Bearer ' + sync.token, 'Accept': 'application/vnd.github+json' }
+    }));
+    if (!r.ok) throw new Error(r.status === 401
+      ? 'Token rejected. Make sure it is a classic token with the gist scope.'
+      : 'GitHub replied ' + r.status + '. Try again.');
+    return r.json();
+  }
+  async function connectSync(token) {
+    sync = { token };
+    const gists = await gh('/gists?per_page=100');
+    const mine = gists.find(g => g.files && g.files[GIST_FILE]);
+    if (mine) { sync.gistId = mine.id; }
+    else {
+      const g = await gh('/gists', { method: 'POST', body: JSON.stringify({
+        description: GIST_DESC, public: false,
+        files: { [GIST_FILE]: { content: JSON.stringify(db) } }
+      })});
+      sync.gistId = g.id;
+    }
+    saveSync();
+    return !!mine;
+  }
+  async function pushCloud() {
+    await gh('/gists/' + sync.gistId, { method: 'PATCH', body: JSON.stringify({
+      files: { [GIST_FILE]: { content: JSON.stringify(db) } }
+    })});
+    sync.last = 'pushed ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    saveSync();
+  }
+  async function pullCloud() {
+    const g = await gh('/gists/' + sync.gistId);
+    const f = g.files[GIST_FILE];
+    if (!f) throw new Error('No vault file found in the cloud copy.');
+    let text = f.content;
+    if (f.truncated) text = await (await fetch(f.raw_url)).text();
+    const data = JSON.parse(text);
+    if (!data || !Array.isArray(data.tasks)) throw new Error('Cloud copy is not a Sanctum vault.');
+    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], ui: { vowsOpen: true } }, data);
+    if (!db.ui) db.ui = { vowsOpen: true };
+    save(); renderAll(); applyVowsFold();
+    sync.last = 'pulled ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    saveSync();
+  }
+
+  function openSyncModal() {
+    const scrim = document.createElement('div');
+    scrim.className = 'scrim';
+    const connected = sync && sync.token && sync.gistId;
+    scrim.innerHTML =
+      '<div class="modal"><div class="modal-body">' +
+        '<label class="f-label">Cloud sync</label>' +
+        (connected
+          ? '<div class="sync-note">Connected to your private vault gist. Push sends this device\'s data up; pull replaces this device\'s data with the cloud copy.</div>' +
+            '<div class="sync-status" id="sy-status">' + (sync.last ? 'LAST ' + sync.last : 'CONNECTED') + '</div>' +
+            '<div class="modal-actions">' +
+              '<button class="primary" id="sy-push">⬆ Push to cloud</button>' +
+              '<button id="sy-pull">⬇ Pull from cloud</button>' +
+              '<span class="grow"></span>' +
+              '<button id="sy-off" class="ghost" style="font-size:10px;font-family:var(--mono);letter-spacing:.1em">DISCONNECT</button>' +
+            '</div>'
+          : '<div class="sync-note">Sync keeps every device\'s vault identical through a <b>secret GitHub Gist</b> only your account can see. One-time setup:<br><br>' +
+            '1. Open <a href="https://github.com/settings/tokens/new?scopes=gist&description=Sanctum+Sync" target="_blank" rel="noopener">github.com/settings/tokens/new</a> (already pre-filled) → set expiry to No expiration → Generate token.<br>' +
+            '2. Copy the token and paste it below. It is stored on this device only.</div>' +
+            '<label class="f-label">Token</label>' +
+            '<input id="sy-token" type="password" placeholder="ghp_…">' +
+            '<div class="sync-status" id="sy-status"></div>' +
+            '<div class="modal-actions"><button class="primary" id="sy-connect">Connect</button></div>') +
+        '<div class="modal-actions"><span class="grow"></span><button id="sy-close">Close</button></div>' +
+      '</div></div>';
+    document.body.appendChild(scrim);
+    const status = (m, cls) => { const el = scrim.querySelector('#sy-status'); el.textContent = m; el.className = 'sync-status' + (cls ? ' ' + cls : ''); };
+    const close = () => scrim.remove();
+    scrim.querySelector('#sy-close').onclick = close;
+    scrim.addEventListener('click', e => { if (e.target === scrim) close(); });
+
+    if (!connected) {
+      scrim.querySelector('#sy-connect').onclick = async () => {
+        const tok = scrim.querySelector('#sy-token').value.trim();
+        if (!tok) { status('PASTE THE TOKEN FIRST', 'err'); return; }
+        status('CONNECTING…');
+        try {
+          const found = await connectSync(tok);
+          status(found ? 'CONNECTED — CLOUD VAULT FOUND. PULL TO LOAD IT.' : 'CONNECTED — NEW CLOUD VAULT CREATED FROM THIS DEVICE.', 'ok');
+          setTimeout(() => { close(); openSyncModal(); }, 1400);
+        } catch (err) { sync = null; status(err.message.toUpperCase(), 'err'); }
+      };
+      return;
+    }
+    scrim.querySelector('#sy-push').onclick = async () => {
+      status('PUSHING…');
+      try { await pushCloud(); status('PUSHED — CLOUD NOW MATCHES THIS DEVICE.', 'ok'); }
+      catch (err) { status(err.message.toUpperCase(), 'err'); }
+    };
+    const pull = scrim.querySelector('#sy-pull');
+    pull.onclick = async () => {
+      if (!pull.dataset.armed) {
+        pull.dataset.armed = '1';
+        pull.textContent = 'Replaces this device — tap again';
+        pull.style.borderColor = 'var(--red)'; pull.style.color = 'var(--red)';
+        return;
+      }
+      status('PULLING…');
+      try { await pullCloud(); status('PULLED — THIS DEVICE NOW MATCHES THE CLOUD.', 'ok'); }
+      catch (err) { status(err.message.toUpperCase(), 'err'); }
+      delete pull.dataset.armed;
+      pull.textContent = '⬇ Pull from cloud';
+      pull.style.borderColor = ''; pull.style.color = '';
+    };
+    scrim.querySelector('#sy-off').onclick = () => {
+      sync = null; localStorage.removeItem(SYNC_KEY);
+      close(); openSyncModal();
+    };
+  }
+  $('sync-btn').onclick = openSyncModal;
 
   /* ---------- export / import ---------- */
   $('export-btn').onclick = () => {
