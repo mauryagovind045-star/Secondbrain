@@ -367,6 +367,26 @@
   .person .pnote{ font-size:12.5px; color:var(--muted); margin-top:8px; }
   .person .actions{ display:flex; gap:4px; margin-top:8px; justify-content:flex-end; }
 
+  /* ---------- library ---------- */
+  .lib-item{
+    display:flex; align-items:center; gap:11px;
+    background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-radius:3px; padding:10px 13px;
+  }
+  .lib-item img{ width:16px; height:16px; flex:none; border-radius:2px; }
+  .lib-item .who{ flex:1; min-width:0; }
+  .lib-item .who a{
+    color:var(--text); text-decoration:none; font-size:13.5px;
+    display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .lib-item .who a:hover{ color:var(--gold); }
+  .lib-item .who small{
+    font-family:var(--mono); font-size:8.5px; color:var(--faint); letter-spacing:.06em;
+  }
+  .lib-item.seen .who a{ color:var(--faint); text-decoration:line-through; }
+  .chip.watch{ color:#7da2c1; border-color:rgba(125,162,193,.35); }
+  .chip.read{ color:var(--gold); border-color:rgba(200,162,75,.35); }
+
   /* ---------- ledger page ---------- */
   .ledger-wrap{ max-width:860px; margin:0 auto; }
   .cat-row{
@@ -650,6 +670,7 @@
     <button class="view-btn" data-view="tasks">Missions</button>
     <button class="view-btn" data-view="dreams">Dreams</button>
     <button class="view-btn" data-view="ledger">Ledger</button>
+    <button class="view-btn" data-view="library">Library</button>
   </nav>
   <div class="head-spacer"></div>
   <div class="clock">
@@ -854,6 +875,25 @@
     </div>
   </div>
 
+  <div id="view-library" hidden>
+    <div class="ledger-wrap">
+      <div class="dreams-head">
+        <h2>The Library</h2><span class="tag">Watch later · read later — one shelf</span>
+      </div>
+      <div class="row" style="flex-wrap:wrap; margin-bottom:8px">
+        <input id="lib-url" placeholder="Paste a link — video, article, thread…" style="flex:2; min-width:220px" aria-label="Link URL">
+        <input id="lib-title" placeholder="Title (optional)" style="flex:1; min-width:140px" aria-label="Title">
+        <select id="lib-kind" aria-label="Type">
+          <option value="watch">WATCH</option>
+          <option value="read">READ</option>
+        </select>
+        <button class="primary" id="lib-add">Shelve it</button>
+      </div>
+      <div class="filters" id="lib-tabs" style="margin:12px 0 14px"></div>
+      <ul class="list" id="lib-list"></ul>
+    </div>
+  </div>
+
   <footer>
     <div class="io">
       <button id="sync-btn">☁ Sync</button>
@@ -879,7 +919,7 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true }, pomo: [] };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [] };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -890,6 +930,7 @@
   if (!Array.isArray(db.expenses)) db.expenses = [];
   if (!Array.isArray(db.dreams)) db.dreams = [];
   if (!Array.isArray(db.pomo)) db.pomo = [];
+  if (!Array.isArray(db.library)) db.library = [];
   if (!db.ui) db.ui = { vowsOpen: true };
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
@@ -1496,7 +1537,7 @@
   /* ---------- view switching ---------- */
   function showView(name) {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-    ['dash', 'tasks', 'dreams', 'ledger'].forEach(v => { $('view-' + v).hidden = v !== name; });
+    ['dash', 'tasks', 'dreams', 'ledger', 'library'].forEach(v => { $('view-' + v).hidden = v !== name; });
     window.scrollTo(0, 0);
   }
   document.querySelectorAll('.view-btn').forEach(btn => {
@@ -1660,6 +1701,71 @@
   }
   $('dream-new').onclick = () => openDream(null);
 
+  /* ---------- the library (watch / read later) ---------- */
+  let libTab = 'watch';
+  const WATCH_HOSTS = /youtube\.|youtu\.be|vimeo\.|netflix\.|hotstar\.|primevideo\.|twitch\./i;
+  function libNormalize(u) {
+    if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    return new URL(u); // throws if hopeless
+  }
+  function renderLibrary() {
+    const open = db.library.filter(x => !x.done);
+    const TABS = [
+      ['watch', 'Watch · ' + open.filter(x => x.kind === 'watch').length],
+      ['read', 'Read · ' + open.filter(x => x.kind === 'read').length],
+      ['done', 'Finished']
+    ];
+    $('lib-tabs').innerHTML = TABS.map(([v, l]) =>
+      '<button data-t="' + v + '"' + (libTab === v ? ' class="active"' : '') + '>' + l + '</button>').join('');
+    $('lib-tabs').querySelectorAll('button').forEach(b => {
+      b.onclick = () => { libTab = b.dataset.t; renderLibrary(); };
+    });
+
+    const shown = db.library.filter(x => libTab === 'done' ? x.done : (!x.done && x.kind === libTab));
+    const ul = $('lib-list');
+    ul.innerHTML = shown.length ? '' :
+      '<div class="empty" style="padding:40px 0">' +
+      (libTab === 'done' ? 'Nothing finished yet.' : 'Shelf is empty. Paste a link above.') + '</div>';
+    shown.forEach(x => {
+      let host = '';
+      try { host = new URL(x.url).hostname.replace(/^www\./, ''); } catch (e) {}
+      const li = document.createElement('li');
+      li.className = 'lib-item' + (x.done ? ' seen' : '');
+      li.innerHTML =
+        '<img src="https://www.google.com/s2/favicons?domain=' + host + '&sz=32" alt="" onerror="this.style.visibility=\'hidden\'">' +
+        '<span class="who"><a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title) + '</a>' +
+        '<small>' + esc(host) + ' · ' + shortDate(x.added) + '</small></span>' +
+        '<span class="chip ' + x.kind + '">' + x.kind + '</span>' +
+        (x.done ? '' : '<button class="mv d" title="Mark finished">✓ DONE</button>') +
+        '<button class="ghost" aria-label="Delete">✕</button>';
+      const d = li.querySelector('.d');
+      if (d) d.onclick = () => { x.done = true; save(); renderLibrary(); };
+      li.querySelector('.ghost').onclick = () => {
+        db.library = db.library.filter(y => y.id !== x.id);
+        save(); renderLibrary();
+      };
+      ul.appendChild(li);
+    });
+  }
+  function addLibrary() {
+    let url;
+    try { url = libNormalize($('lib-url').value.trim()); }
+    catch (e) { $('lib-url').focus(); return; }
+    const title = $('lib-title').value.trim() ||
+      url.hostname.replace(/^www\./, '') + (url.pathname.length > 1 ? ' — ' + decodeURIComponent(url.pathname.slice(1, 60)).replace(/[-_/]+/g, ' ').trim() : '');
+    db.library.unshift({ id: uid(), url: url.href, title, kind: $('lib-kind').value, done: false, added: todayKey() });
+    $('lib-url').value = ''; $('lib-title').value = '';
+    libTab = db.library[0].kind;
+    save(); renderLibrary();
+  }
+  $('lib-add').onclick = addLibrary;
+  ['lib-url', 'lib-title'].forEach(id =>
+    $(id).addEventListener('keydown', e => { if (e.key === 'Enter') addLibrary(); }));
+  $('lib-url').addEventListener('input', () => {
+    try { $('lib-kind').value = WATCH_HOSTS.test(libNormalize($('lib-url').value.trim()).hostname) ? 'watch' : 'read'; }
+    catch (e) {}
+  });
+
   /* ---------- cloud sync (private gist) ---------- */
   const SYNC_KEY = 'sanctum.sync';
   const GIST_FILE = 'sanctum-vault.json';
@@ -1707,7 +1813,7 @@
     if (f.truncated) text = await (await fetch(f.raw_url)).text();
     const data = JSON.parse(text);
     if (!data || !Array.isArray(data.tasks)) throw new Error('Cloud copy is not a Sanctum vault.');
-    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], ui: { vowsOpen: true } }, data);
+    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], ui: { vowsOpen: true } }, data);
     if (!db.ui) db.ui = { vowsOpen: true };
     save(); renderAll(); applyVowsFold();
     sync.last = 'pulled ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -1801,13 +1907,14 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [] }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [] }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
         if (!Array.isArray(db.expenses)) db.expenses = [];
         if (!Array.isArray(db.dreams)) db.dreams = [];
         if (!Array.isArray(db.pomo)) db.pomo = [];
+        if (!Array.isArray(db.library)) db.library = [];
         save(); renderAll();
       } catch (err) { alert('That file is not a valid Sanctum backup.'); }
     };
@@ -1816,7 +1923,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderStats();
+    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderLibrary(); renderStats();
   }
   renderAll();
 })();
