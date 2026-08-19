@@ -292,6 +292,29 @@
   .tgroup::after{ content:""; flex:1; height:1px; background:var(--line-soft); }
   .tgroup.hot{ color:var(--red); }
 
+  /* ---------- focus (pomodoro) ---------- */
+  .pomo-time{
+    font-family:var(--heads); font-weight:600; font-size:56px;
+    text-align:center; line-height:1; margin:16px 0 6px;
+    font-variant-numeric:tabular-nums; letter-spacing:.04em;
+  }
+  .pomo-state{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    letter-spacing:.3em; text-transform:uppercase; text-align:center;
+    margin-bottom:12px;
+  }
+  .pomo-state.focus{ color:var(--gold); }
+  .pomo-state.break{ color:var(--ok); }
+  .pomo-bar{
+    height:4px; background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-radius:2px; overflow:hidden;
+  }
+  .pomo-bar i{
+    display:block; height:100%; width:0;
+    background:linear-gradient(90deg,var(--red-dim),var(--red));
+    transition:width 1s linear;
+  }
+
   /* ---------- inbox ---------- */
   .inbox-item{
     display:flex; align-items:center; gap:8px;
@@ -633,7 +656,7 @@
     <div class="front-stats">
       OPEN <b id="stat-open">0</b><span class="sep">·</span>
       CLEARED TODAY <b id="stat-done">0</b><span class="sep">·</span>
-      PEOPLE <b id="stat-people">0</b><span class="sep">·</span>
+      FOCUS <b id="stat-focus">0m</b><span class="sep">·</span>
       BEST STREAK <b id="stat-streak">0<em>d</em></b>
     </div>
   </section>
@@ -727,22 +750,22 @@
     <div class="col">
       <section class="panel">
         <div class="panel-head">
-          <h2>People</h2><span class="tag">Allies</span>
-          <span class="count" id="people-count">0</span>
+          <h2>Focus</h2><span class="tag">Deep work timer</span>
+          <span class="count" id="pomo-today">0m today</span>
         </div>
         <div class="panel-body">
-          <div class="row">
-            <input id="person-name" placeholder="Name" aria-label="Person name">
-            <select id="person-sphere" aria-label="Person sphere">
-              <option value="work">WORK</option>
-              <option value="life">LIFE</option>
-            </select>
+          <div class="filters" id="pomo-durs" style="justify-content:center">
+            <button data-m="25" class="active">25 min</button>
+            <button data-m="45">45 min</button>
+            <button data-m="90">90 min</button>
           </div>
-          <div class="row">
-            <input id="person-note" placeholder="Context — who they are, what matters" aria-label="Person note">
-            <button class="primary" id="person-add">Add</button>
+          <div class="pomo-time" id="pomo-time">25:00</div>
+          <div class="pomo-state" id="pomo-state">READY</div>
+          <div class="pomo-bar"><i id="pomo-bar"></i></div>
+          <div class="row" style="margin-top:14px">
+            <button class="primary" id="pomo-start" style="flex:1">Start</button>
+            <button id="pomo-stop">Stop</button>
           </div>
-          <ul class="list" id="people-list" style="margin-top:12px"></ul>
         </div>
       </section>
 
@@ -845,7 +868,7 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true } };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true }, pomo: [] };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -855,6 +878,7 @@
   if (!Array.isArray(db.inbox)) db.inbox = [];
   if (!Array.isArray(db.expenses)) db.expenses = [];
   if (!Array.isArray(db.dreams)) db.dreams = [];
+  if (!Array.isArray(db.pomo)) db.pomo = [];
   if (!db.ui) db.ui = { vowsOpen: true };
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
@@ -891,7 +915,9 @@
   function renderStats() {
     $('stat-open').textContent = db.tasks.filter(t => !t.done).length;
     $('stat-done').textContent = db.tasks.filter(t => t.done && t.doneOn === todayKey()).length;
-    $('stat-people').textContent = db.people.length;
+    const focusMins = db.pomo.filter(p => p.date === todayKey()).reduce((s, p) => s + p.mins, 0);
+    $('stat-focus').textContent = focusMins + 'm';
+    $('pomo-today').textContent = focusMins + 'm today';
     let best = 0;
     db.habits.forEach(h => { best = Math.max(best, streakOf(h)); });
     $('stat-streak').innerHTML = best + '<em>d</em>';
@@ -1115,41 +1141,79 @@
   $('inbox-add').onclick = addInbox;
   $('inbox-input').addEventListener('keydown', e => { if (e.key === 'Enter') addInbox(); });
 
-  /* ---------- people ---------- */
+  /* ---------- focus (pomodoro) ---------- */
   const daysSince = iso => Math.floor((new Date(todayKey()) - new Date(iso)) / 864e5);
-  function renderPeople() {
-    const ul = $('people-list');
-    $('people-count').textContent = db.people.length;
-    ul.innerHTML = db.people.length ? '' : '<div class="empty">No one on file.</div>';
-    [...db.people].sort((a, b) => daysSince(b.lastTouch) - daysSince(a.lastTouch)).forEach(p => {
-      const d = daysSince(p.lastTouch);
-      const li = document.createElement('li');
-      li.className = 'person';
-      li.innerHTML =
-        '<div class="top">' +
-          '<div class="avatar">' + esc(p.name[0].toUpperCase()) + '</div>' +
-          '<div class="who"><b>' + esc(p.name) + '</b><small>' + p.sphere + '</small></div>' +
-          '<div class="touch' + (d > 30 ? ' cold' : '') + '">' + (d === 0 ? 'today' : d + 'd ago') + '<br>last touch</div>' +
-        '</div>' +
-        (p.note ? '<div class="pnote">' + esc(p.note) + '</div>' : '') +
-        '<div class="actions">' +
-          '<button class="ghost touch-btn" style="font-size:10px;letter-spacing:.1em;font-family:var(--mono)">MARK CONTACTED</button>' +
-          '<button class="ghost del-btn" aria-label="Delete person">✕</button>' +
-        '</div>';
-      li.querySelector('.touch-btn').onclick = () => { p.lastTouch = todayKey(); save(); renderPeople(); };
-      li.querySelector('.del-btn').onclick = () => { db.people = db.people.filter(x => x.id !== p.id); save(); renderPeople(); renderStats(); };
-      ul.appendChild(li);
-    });
+  const POMO_BREAK = { 25: 5, 45: 10, 90: 15 };
+  const pomo = { mode: 'ready', dur: 25, left: 0, total: 0, timer: null };
+  const baseTitle = document.title;
+
+  function pomoBeep(times) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      for (let i = 0; i < times; i++) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.35);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.35 + 0.28);
+        o.start(ctx.currentTime + i * 0.35);
+        o.stop(ctx.currentTime + i * 0.35 + 0.3);
+      }
+    } catch (e) { /* no audio — silent transition */ }
   }
-  function addPerson() {
-    const name = $('person-name').value.trim();
-    if (!name) return;
-    db.people.unshift({ id: uid(), name, sphere: $('person-sphere').value, note: $('person-note').value.trim(), lastTouch: todayKey() });
-    $('person-name').value = ''; $('person-note').value = '';
-    save(); renderPeople(); renderStats();
+  const mmss = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  function pomoPaint() {
+    $('pomo-time').textContent = mmss(pomo.mode === 'ready' ? pomo.dur * 60 : pomo.left);
+    const st = $('pomo-state');
+    st.textContent = pomo.mode === 'focus' ? 'FOCUS — HOLD THE LINE'
+                   : pomo.mode === 'break' ? 'BREAK — BREATHE'
+                   : 'READY';
+    st.className = 'pomo-state' + (pomo.mode !== 'ready' ? ' ' + pomo.mode : '');
+    $('pomo-bar').style.width = pomo.mode === 'ready' ? '0%'
+      : (100 * (1 - pomo.left / pomo.total)) + '%';
+    document.title = pomo.mode === 'ready' ? baseTitle
+      : mmss(pomo.left) + ' · ' + (pomo.mode === 'focus' ? 'FOCUS' : 'BREAK') + ' — The Sanctum';
   }
-  $('person-add').onclick = addPerson;
-  $('person-name').addEventListener('keydown', e => { if (e.key === 'Enter') addPerson(); });
+  function pomoTick() {
+    pomo.left--;
+    if (pomo.left <= 0) {
+      if (pomo.mode === 'focus') {
+        db.pomo.push({ date: todayKey(), mins: pomo.dur });
+        save(); renderStats();
+        pomo.mode = 'break';
+        pomo.total = pomo.left = POMO_BREAK[pomo.dur] * 60;
+        pomoBeep(2);
+      } else {
+        pomoStop(true);
+        pomoBeep(3);
+        return;
+      }
+    }
+    pomoPaint();
+  }
+  function pomoStart() {
+    if (pomo.mode !== 'ready') return;
+    pomo.mode = 'focus';
+    pomo.total = pomo.left = pomo.dur * 60;
+    pomo.timer = setInterval(pomoTick, 1000);
+    pomoPaint();
+  }
+  function pomoStop(finished) {
+    clearInterval(pomo.timer);
+    pomo.timer = null;
+    pomo.mode = 'ready';
+    pomoPaint();
+  }
+  $('pomo-start').onclick = pomoStart;
+  $('pomo-stop').onclick = () => pomoStop(false);
+  $('pomo-durs').querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      if (pomo.mode !== 'ready') return;
+      pomo.dur = parseInt(b.dataset.m, 10);
+      [...$('pomo-durs').children].forEach(x => x.classList.toggle('active', x === b));
+      pomoPaint();
+    };
+  });
 
   /* ---------- protocol (habits) ---------- */
   const last7 = () => Array.from({ length: 7 }, (_, i) => {
@@ -1601,12 +1665,13 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [] }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [] }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
         if (!Array.isArray(db.expenses)) db.expenses = [];
         if (!Array.isArray(db.dreams)) db.dreams = [];
+        if (!Array.isArray(db.pomo)) db.pomo = [];
         save(); renderAll();
       } catch (err) { alert('That file is not a valid Sanctum backup.'); }
     };
@@ -1615,7 +1680,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderTasksPage(); renderInbox(); renderPeople(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderStats();
+    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderStats();
   }
   renderAll();
 })();
