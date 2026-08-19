@@ -307,6 +307,7 @@
   .inbox-item .mv:hover{ border-color:var(--faint); color:var(--text); }
   .inbox-item .mv.w:hover{ border-color:rgba(200,162,75,.5); color:var(--gold); }
   .inbox-item .mv.l:hover{ border-color:rgba(125,162,193,.5); color:#7da2c1; }
+  .inbox-item .mv.d:hover{ border-color:rgba(79,143,95,.6); color:var(--ok); }
   .inbox-toggle{
     width:100%; margin-top:12px;
     background:none; border:1px dashed var(--line); border-radius:3px;
@@ -1063,14 +1064,16 @@
     li.className = 'inbox-item';
     li.innerHTML =
       '<span class="txt">' + esc(it.text) + '</span>' +
+      '<button class="mv d" title="Already handled — mark done">✓ DONE</button>' +
       '<button class="mv w" title="Move to Missions as WORK">→ WORK</button>' +
       '<button class="mv l" title="Move to Missions as LIFE">→ LIFE</button>' +
       '<button class="ghost" aria-label="Delete">✕</button>';
-    const moveTo = sphere => {
-      db.tasks.unshift({ id: uid(), text: it.text, sphere, prio: 'med', due: null, done: false, doneOn: null });
+    const moveTo = (sphere, done) => {
+      db.tasks.unshift({ id: uid(), text: it.text, sphere, prio: 'med', due: null, done: !!done, doneOn: done ? todayKey() : null });
       db.inbox = db.inbox.filter(x => x.id !== it.id);
       save(); refreshInbox(); renderTasks(); renderStats();
     };
+    li.querySelector('.d').onclick = () => moveTo('life', true);
     li.querySelector('.w').onclick = () => moveTo('work');
     li.querySelector('.l').onclick = () => moveTo('life');
     li.querySelector('.ghost').onclick = () => {
