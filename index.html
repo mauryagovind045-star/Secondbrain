@@ -398,8 +398,23 @@
     white-space:pre-wrap; overflow-wrap:break-word;
   }
   .j-text.dim{ color:var(--faint); }
-  .j-edit{ min-height:88px; margin-bottom:8px; }
-  .j-save{ font-size:9.5px; padding:6px 12px; }
+  .j-save{ font-size:9.5px; padding:6px 12px; margin-top:4px; }
+  .j-q{
+    font-family:var(--mono); font-size:8.5px; color:var(--faint);
+    letter-spacing:.16em; text-transform:uppercase;
+    margin:12px 0 6px; font-style:normal;
+  }
+  .j-line{ display:flex; align-items:center; gap:9px; margin-bottom:6px; }
+  .j-line b{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    font-weight:400; width:10px; flex:none;
+  }
+  .j-line input{ font-size:13px; padding:7px 10px; }
+  .j-ro{ font-size:13.5px; color:var(--muted); line-height:1.6; padding:1px 0; }
+  .j-ro b{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    font-weight:400; margin-right:7px;
+  }
 
   /* ---------- library ---------- */
   .lib-item{
@@ -1747,36 +1762,68 @@
   }
   $('dream-new').onclick = () => openDream(null);
 
-  /* ---------- the journal (dawn & dusk) ---------- */
-  const J_META = {
-    dawn: { icon: '☀', label: 'Dawn — walk in with intent', ph: 'What matters today? The one thing that must happen. How do you feel walking in?' },
-    dusk: { icon: '☾', label: 'Dusk — close the day', ph: 'How did it go? What did you learn? What are you grateful for tonight?' }
+  /* ---------- the journal (five-minute format) ---------- */
+  const J_EMPTY = () => ({ grateful: ['', '', ''], great: ['', '', ''], affirm: '', highlights: ['', '', ''], learned: '' });
+  const J_SECTIONS = {
+    morning: { icon: '☀', cls: 'dawn', title: 'Morning', qs: [
+      { key: 'grateful', label: 'I am grateful for…', n: 3 },
+      { key: 'great', label: 'What would make today great?', n: 3 },
+      { key: 'affirm', label: 'Daily affirmation', n: 1 }
+    ]},
+    evening: { icon: '☾', cls: 'dusk', title: 'Evening', qs: [
+      { key: 'highlights', label: 'Highlights of the day', n: 3 },
+      { key: 'learned', label: 'What did I learn today?', n: 1 }
+    ]}
   };
   const jEditing = {};
+  function jMigrate() {
+    Object.keys(db.journal).forEach(k => {
+      const e = db.journal[k];
+      if (e && ('dawn' in e || 'dusk' in e)) {
+        const ne = J_EMPTY();
+        if (e.dawn) ne.great[0] = e.dawn;
+        if (e.dusk) ne.highlights[0] = e.dusk;
+        db.journal[k] = ne;
+      }
+    });
+  }
+  const jHas = e => !!e && (
+    (e.grateful || []).some(x => x.trim()) || (e.great || []).some(x => x.trim()) ||
+    (e.affirm || '').trim() || (e.highlights || []).some(x => x.trim()) || (e.learned || '').trim());
   function jStreak() {
     let s = 0; const d = new Date();
-    const has = k => db.journal[k] && ((db.journal[k].dawn || '') + (db.journal[k].dusk || '')).trim();
-    if (!has(todayKey(d))) d.setDate(d.getDate() - 1);
-    while (has(todayKey(d))) { s++; d.setDate(d.getDate() - 1); }
+    if (!jHas(db.journal[todayKey(d)])) d.setDate(d.getDate() - 1);
+    while (jHas(db.journal[todayKey(d)])) { s++; d.setDate(d.getDate() - 1); }
     return s;
   }
-  function jBlock(k, field, isToday) {
-    const entry = (db.journal[k] && db.journal[k][field]) || '';
-    const m = J_META[field];
+  function jSection(k, sk, isToday) {
+    const sec = J_SECTIONS[sk];
+    const e = Object.assign(J_EMPTY(), db.journal[k] || {});
     const wrap = document.createElement('div');
     wrap.className = 'j-block';
-    const editing = isToday || (jEditing[k] && jEditing[k][field]);
+    const editing = isToday || jEditing[k + sk];
 
     if (editing) {
-      wrap.innerHTML =
-        '<div class="j-label ' + field + '">' + m.icon + ' ' + m.label + '<span class="saved"></span></div>' +
-        '<textarea class="j-edit" placeholder="' + m.ph + '"></textarea>' +
-        '<button class="j-save">Save</button>';
-      const ta = wrap.querySelector('textarea');
-      ta.value = entry;
+      let html = '<div class="j-label ' + sec.cls + '">' + sec.icon + ' ' + sec.title + '<span class="saved"></span></div>';
+      sec.qs.forEach(q => {
+        html += '<div class="j-q">' + q.label + '</div>';
+        for (let i = 0; i < q.n; i++) {
+          const v = q.n > 1 ? e[q.key][i] : e[q.key];
+          html += '<div class="j-line">' + (q.n > 1 ? '<b>' + (i + 1) + '.</b>' : '') +
+            '<input data-q="' + q.key + '" data-i="' + i + '" value="' + esc(v || '').replace(/"/g, '&quot;') + '"></div>';
+        }
+      });
+      html += '<button class="j-save">Save</button>';
+      wrap.innerHTML = html;
       const doSave = quiet => {
-        if (!db.journal[k]) db.journal[k] = { dawn: '', dusk: '' };
-        db.journal[k][field] = ta.value.trim();
+        if (!db.journal[k]) db.journal[k] = J_EMPTY();
+        const entry = Object.assign(J_EMPTY(), db.journal[k]);
+        wrap.querySelectorAll('input[data-q]').forEach(inp => {
+          const q = inp.dataset.q, i = +inp.dataset.i;
+          if (Array.isArray(entry[q])) entry[q][i] = inp.value.trim();
+          else entry[q] = inp.value.trim();
+        });
+        db.journal[k] = entry;
         save();
         $('j-streak').textContent = jStreak() + '-day streak';
         if (!quiet) {
@@ -1784,24 +1831,32 @@
           s.textContent = 'SAVED';
           setTimeout(() => { s.textContent = ''; }, 1500);
         }
-        if (!isToday) { jEditing[k][field] = false; renderJournal(); }
+        if (!isToday) { jEditing[k + sk] = false; renderJournal(); }
       };
       wrap.querySelector('.j-save').onclick = () => doSave(false);
-      if (isToday) ta.addEventListener('blur', () => doSave(true));
+      if (isToday) wrap.querySelectorAll('input[data-q]').forEach(inp =>
+        inp.addEventListener('blur', () => doSave(true)));
     } else {
-      wrap.innerHTML =
-        '<div class="j-label ' + field + '">' + m.icon + ' ' + m.label +
-        '<button class="ghost" title="Edit">✎</button></div>' +
-        (entry ? '<div class="j-text">' + esc(entry) + '</div>' : '<div class="j-text dim">—</div>');
-      wrap.querySelector('.ghost').onclick = () => {
-        jEditing[k] = jEditing[k] || {};
-        jEditing[k][field] = true;
-        renderJournal();
-      };
+      let html = '<div class="j-label ' + sec.cls + '">' + sec.icon + ' ' + sec.title +
+        '<button class="ghost" title="Edit">✎</button></div>';
+      let any = false;
+      sec.qs.forEach(q => {
+        const vals = (q.n > 1 ? e[q.key] : [e[q.key]]).filter(x => (x || '').trim());
+        if (!vals.length) return;
+        any = true;
+        html += '<div class="j-q">' + q.label + '</div>';
+        vals.forEach((v, i) => {
+          html += '<div class="j-ro">' + (q.n > 1 ? '<b>' + (i + 1) + '.</b>' : '') + esc(v) + '</div>';
+        });
+      });
+      if (!any) html += '<div class="j-text dim">—</div>';
+      wrap.innerHTML = html;
+      wrap.querySelector('.ghost').onclick = () => { jEditing[k + sk] = true; renderJournal(); };
     }
     return wrap;
   }
   function renderJournal() {
+    jMigrate();
     const box = $('journal-list');
     box.innerHTML = '';
     const today = todayKey();
@@ -1817,8 +1872,8 @@
       const nice = new Date(k + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
       head.innerHTML = isToday ? '<em>Today</em> · ' + nice : nice;
       card.appendChild(head);
-      card.appendChild(jBlock(k, 'dawn', isToday));
-      card.appendChild(jBlock(k, 'dusk', isToday));
+      card.appendChild(jSection(k, 'morning', isToday));
+      card.appendChild(jSection(k, 'evening', isToday));
       box.appendChild(card);
     });
     if (dates.length > 60) {
