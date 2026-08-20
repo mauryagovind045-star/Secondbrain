@@ -367,6 +367,40 @@
   .person .pnote{ font-size:12.5px; color:var(--muted); margin-top:8px; }
   .person .actions{ display:flex; gap:4px; margin-top:8px; justify-content:flex-end; }
 
+  /* ---------- journal ---------- */
+  .journal-wrap{ max-width:760px; margin:0 auto; }
+  .j-day{
+    background:var(--panel); border:1px solid var(--line-soft);
+    border-radius:var(--radius); padding:16px 18px 18px; margin-bottom:16px;
+  }
+  .j-day.today{ border-color:var(--line); }
+  .j-date{
+    font-family:var(--heads); font-weight:500; font-size:13.5px;
+    letter-spacing:.22em; text-transform:uppercase; margin-bottom:14px;
+  }
+  .j-date em{ font-style:normal; color:var(--red); }
+  .j-block{ margin-bottom:14px; }
+  .j-block:last-child{ margin-bottom:0; }
+  .j-label{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.22em;
+    text-transform:uppercase; margin-bottom:7px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .j-label.dawn{ color:var(--gold); }
+  .j-label.dusk{ color:#7da2c1; }
+  .j-label .ghost{ margin-left:auto; font-size:11px; }
+  .j-label .saved{
+    font-family:var(--mono); font-size:8px; color:var(--ok);
+    letter-spacing:.14em; margin-left:auto;
+  }
+  .j-text{
+    font-size:13.5px; color:var(--muted); line-height:1.65;
+    white-space:pre-wrap; overflow-wrap:break-word;
+  }
+  .j-text.dim{ color:var(--faint); }
+  .j-edit{ min-height:88px; margin-bottom:8px; }
+  .j-save{ font-size:9.5px; padding:6px 12px; }
+
   /* ---------- library ---------- */
   .lib-item{
     display:flex; align-items:center; gap:11px;
@@ -671,6 +705,7 @@
     <button class="view-btn" data-view="dreams">Dreams</button>
     <button class="view-btn" data-view="ledger">Ledger</button>
     <button class="view-btn" data-view="library">Library</button>
+    <button class="view-btn" data-view="journal">Journal</button>
   </nav>
   <div class="head-spacer"></div>
   <div class="clock">
@@ -894,6 +929,16 @@
     </div>
   </div>
 
+  <div id="view-journal" hidden>
+    <div class="journal-wrap">
+      <div class="dreams-head">
+        <h2>The Journal</h2><span class="tag">Dawn and dusk · every day</span>
+        <span class="count" id="j-streak" style="margin-left:auto"></span>
+      </div>
+      <div id="journal-list"></div>
+    </div>
+  </div>
+
   <footer>
     <div class="io">
       <button id="sync-btn">☁ Sync</button>
@@ -919,7 +964,7 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [] };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {} };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -931,6 +976,7 @@
   if (!Array.isArray(db.dreams)) db.dreams = [];
   if (!Array.isArray(db.pomo)) db.pomo = [];
   if (!Array.isArray(db.library)) db.library = [];
+  if (!db.journal || typeof db.journal !== 'object' || Array.isArray(db.journal)) db.journal = {};
   if (!db.ui) db.ui = { vowsOpen: true };
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
@@ -1537,7 +1583,7 @@
   /* ---------- view switching ---------- */
   function showView(name) {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-    ['dash', 'tasks', 'dreams', 'ledger', 'library'].forEach(v => { $('view-' + v).hidden = v !== name; });
+    ['dash', 'tasks', 'dreams', 'ledger', 'library', 'journal'].forEach(v => { $('view-' + v).hidden = v !== name; });
     window.scrollTo(0, 0);
   }
   document.querySelectorAll('.view-btn').forEach(btn => {
@@ -1701,6 +1747,86 @@
   }
   $('dream-new').onclick = () => openDream(null);
 
+  /* ---------- the journal (dawn & dusk) ---------- */
+  const J_META = {
+    dawn: { icon: '☀', label: 'Dawn — walk in with intent', ph: 'What matters today? The one thing that must happen. How do you feel walking in?' },
+    dusk: { icon: '☾', label: 'Dusk — close the day', ph: 'How did it go? What did you learn? What are you grateful for tonight?' }
+  };
+  const jEditing = {};
+  function jStreak() {
+    let s = 0; const d = new Date();
+    const has = k => db.journal[k] && ((db.journal[k].dawn || '') + (db.journal[k].dusk || '')).trim();
+    if (!has(todayKey(d))) d.setDate(d.getDate() - 1);
+    while (has(todayKey(d))) { s++; d.setDate(d.getDate() - 1); }
+    return s;
+  }
+  function jBlock(k, field, isToday) {
+    const entry = (db.journal[k] && db.journal[k][field]) || '';
+    const m = J_META[field];
+    const wrap = document.createElement('div');
+    wrap.className = 'j-block';
+    const editing = isToday || (jEditing[k] && jEditing[k][field]);
+
+    if (editing) {
+      wrap.innerHTML =
+        '<div class="j-label ' + field + '">' + m.icon + ' ' + m.label + '<span class="saved"></span></div>' +
+        '<textarea class="j-edit" placeholder="' + m.ph + '"></textarea>' +
+        '<button class="j-save">Save</button>';
+      const ta = wrap.querySelector('textarea');
+      ta.value = entry;
+      const doSave = quiet => {
+        if (!db.journal[k]) db.journal[k] = { dawn: '', dusk: '' };
+        db.journal[k][field] = ta.value.trim();
+        save();
+        $('j-streak').textContent = jStreak() + '-day streak';
+        if (!quiet) {
+          const s = wrap.querySelector('.saved');
+          s.textContent = 'SAVED';
+          setTimeout(() => { s.textContent = ''; }, 1500);
+        }
+        if (!isToday) { jEditing[k][field] = false; renderJournal(); }
+      };
+      wrap.querySelector('.j-save').onclick = () => doSave(false);
+      if (isToday) ta.addEventListener('blur', () => doSave(true));
+    } else {
+      wrap.innerHTML =
+        '<div class="j-label ' + field + '">' + m.icon + ' ' + m.label +
+        '<button class="ghost" title="Edit">✎</button></div>' +
+        (entry ? '<div class="j-text">' + esc(entry) + '</div>' : '<div class="j-text dim">—</div>');
+      wrap.querySelector('.ghost').onclick = () => {
+        jEditing[k] = jEditing[k] || {};
+        jEditing[k][field] = true;
+        renderJournal();
+      };
+    }
+    return wrap;
+  }
+  function renderJournal() {
+    const box = $('journal-list');
+    box.innerHTML = '';
+    const today = todayKey();
+    const dates = [...new Set([today, ...Object.keys(db.journal)])]
+      .filter(k => k <= today)
+      .sort().reverse();
+    dates.slice(0, 60).forEach(k => {
+      const isToday = k === today;
+      const card = document.createElement('div');
+      card.className = 'j-day' + (isToday ? ' today' : '');
+      const head = document.createElement('div');
+      head.className = 'j-date';
+      const nice = new Date(k + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      head.innerHTML = isToday ? '<em>Today</em> · ' + nice : nice;
+      card.appendChild(head);
+      card.appendChild(jBlock(k, 'dawn', isToday));
+      card.appendChild(jBlock(k, 'dusk', isToday));
+      box.appendChild(card);
+    });
+    if (dates.length > 60) {
+      box.insertAdjacentHTML('beforeend', '<div class="empty">+ ' + (dates.length - 60) + ' older days kept in the vault</div>');
+    }
+    $('j-streak').textContent = jStreak() + '-day streak';
+  }
+
   /* ---------- the library (watch / read later) ---------- */
   let libTab = 'watch';
   const WATCH_HOSTS = /youtube\.|youtu\.be|vimeo\.|netflix\.|hotstar\.|primevideo\.|twitch\./i;
@@ -1813,7 +1939,7 @@
     if (f.truncated) text = await (await fetch(f.raw_url)).text();
     const data = JSON.parse(text);
     if (!data || !Array.isArray(data.tasks)) throw new Error('Cloud copy is not a Sanctum vault.');
-    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], ui: { vowsOpen: true } }, data);
+    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], journal: {}, ui: { vowsOpen: true } }, data);
     if (!db.ui) db.ui = { vowsOpen: true };
     save(); renderAll(); applyVowsFold();
     sync.last = 'pulled ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -1907,7 +2033,7 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [] }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], journal: {} }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
@@ -1915,6 +2041,7 @@
         if (!Array.isArray(db.dreams)) db.dreams = [];
         if (!Array.isArray(db.pomo)) db.pomo = [];
         if (!Array.isArray(db.library)) db.library = [];
+        if (!db.journal || typeof db.journal !== 'object' || Array.isArray(db.journal)) db.journal = {};
         save(); renderAll();
       } catch (err) { alert('That file is not a valid Sanctum backup.'); }
     };
@@ -1923,7 +2050,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderLibrary(); renderStats();
+    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderLibrary(); renderJournal(); renderStats();
   }
   renderAll();
 })();
