@@ -388,6 +388,8 @@
   }
   .j-label.dawn{ color:var(--gold); }
   .j-label.dusk{ color:#7da2c1; }
+  .j-label.mind{ color:var(--muted); }
+  .j-edit{ min-height:96px; margin-bottom:8px; font-size:13px; }
   .j-label .ghost{ margin-left:auto; font-size:11px; }
   .j-label .saved{
     font-family:var(--mono); font-size:8px; color:var(--ok);
@@ -1763,7 +1765,7 @@
   $('dream-new').onclick = () => openDream(null);
 
   /* ---------- the journal (five-minute format) ---------- */
-  const J_EMPTY = () => ({ grateful: ['', '', ''], great: ['', '', ''], affirm: '', highlights: ['', '', ''], learned: '' });
+  const J_EMPTY = () => ({ grateful: ['', '', ''], great: ['', '', ''], affirm: '', highlights: ['', '', ''], learned: '', dump: '' });
   const J_SECTIONS = {
     morning: { icon: '☀', cls: 'dawn', title: 'Morning', qs: [
       { key: 'grateful', label: 'I am grateful for…', n: 3 },
@@ -1773,6 +1775,9 @@
     evening: { icon: '☾', cls: 'dusk', title: 'Evening', qs: [
       { key: 'highlights', label: 'Highlights of the day', n: 3 },
       { key: 'learned', label: 'What did I learn today?', n: 1 }
+    ]},
+    mind: { icon: '✦', cls: 'mind', title: 'Mind', qs: [
+      { key: 'dump', label: 'Dump anything — thoughts, rants, ideas, whatever needs out', n: 1, area: true }
     ]}
   };
   const jEditing = {};
@@ -1789,7 +1794,7 @@
   }
   const jHas = e => !!e && (
     (e.grateful || []).some(x => x.trim()) || (e.great || []).some(x => x.trim()) ||
-    (e.affirm || '').trim() || (e.highlights || []).some(x => x.trim()) || (e.learned || '').trim());
+    (e.affirm || '').trim() || (e.highlights || []).some(x => x.trim()) || (e.learned || '').trim() || (e.dump || '').trim());
   function jStreak() {
     let s = 0; const d = new Date();
     if (!jHas(db.journal[todayKey(d)])) d.setDate(d.getDate() - 1);
@@ -1807,6 +1812,10 @@
       let html = '<div class="j-label ' + sec.cls + '">' + sec.icon + ' ' + sec.title + '<span class="saved"></span></div>';
       sec.qs.forEach(q => {
         html += '<div class="j-q">' + q.label + '</div>';
+        if (q.area) {
+          html += '<textarea class="j-edit" data-q="' + q.key + '" data-i="0">' + esc(e[q.key] || '') + '</textarea>';
+          return;
+        }
         for (let i = 0; i < q.n; i++) {
           const v = q.n > 1 ? e[q.key][i] : e[q.key];
           html += '<div class="j-line">' + (q.n > 1 ? '<b>' + (i + 1) + '.</b>' : '') +
@@ -1818,7 +1827,7 @@
       const doSave = quiet => {
         if (!db.journal[k]) db.journal[k] = J_EMPTY();
         const entry = Object.assign(J_EMPTY(), db.journal[k]);
-        wrap.querySelectorAll('input[data-q]').forEach(inp => {
+        wrap.querySelectorAll('[data-q]').forEach(inp => {
           const q = inp.dataset.q, i = +inp.dataset.i;
           if (Array.isArray(entry[q])) entry[q][i] = inp.value.trim();
           else entry[q] = inp.value.trim();
@@ -1834,7 +1843,7 @@
         if (!isToday) { jEditing[k + sk] = false; renderJournal(); }
       };
       wrap.querySelector('.j-save').onclick = () => doSave(false);
-      if (isToday) wrap.querySelectorAll('input[data-q]').forEach(inp =>
+      if (isToday) wrap.querySelectorAll('[data-q]').forEach(inp =>
         inp.addEventListener('blur', () => doSave(true)));
     } else {
       let html = '<div class="j-label ' + sec.cls + '">' + sec.icon + ' ' + sec.title +
@@ -1846,7 +1855,8 @@
         any = true;
         html += '<div class="j-q">' + q.label + '</div>';
         vals.forEach((v, i) => {
-          html += '<div class="j-ro">' + (q.n > 1 ? '<b>' + (i + 1) + '.</b>' : '') + esc(v) + '</div>';
+          html += '<div class="j-ro"' + (q.area ? ' style="white-space:pre-wrap"' : '') + '>' +
+            (q.n > 1 ? '<b>' + (i + 1) + '.</b>' : '') + esc(v) + '</div>';
         });
       });
       if (!any) html += '<div class="j-text dim">—</div>';
@@ -1874,6 +1884,7 @@
       card.appendChild(head);
       card.appendChild(jSection(k, 'morning', isToday));
       card.appendChild(jSection(k, 'evening', isToday));
+      card.appendChild(jSection(k, 'mind', isToday));
       box.appendChild(card);
     });
     if (dates.length > 60) {
