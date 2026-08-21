@@ -437,6 +437,21 @@
   .lib-item.seen .who a{ color:var(--faint); text-decoration:line-through; }
   .chip.watch{ color:#7da2c1; border-color:rgba(125,162,193,.35); }
   .chip.read{ color:var(--gold); border-color:rgba(200,162,75,.35); }
+  .note-card{
+    background:var(--bg-deep); border:1px solid var(--line-soft);
+    border-left:2px solid var(--red-dim); border-radius:3px;
+    padding:12px 14px;
+  }
+  .note-card b{ font-weight:500; font-size:14px; display:block; }
+  .note-card p{
+    font-size:13px; color:var(--muted); margin-top:6px;
+    white-space:pre-wrap; overflow-wrap:break-word; line-height:1.6;
+  }
+  .note-card .meta{
+    display:flex; align-items:center; gap:4px; margin-top:9px;
+    font-family:var(--mono); font-size:8.5px; color:var(--faint); letter-spacing:.1em;
+  }
+  .note-card .meta .grow{ flex:1; }
 
   /* ---------- ledger page ---------- */
   .ledger-wrap{ max-width:860px; margin:0 auto; }
@@ -930,9 +945,9 @@
   <div id="view-library" hidden>
     <div class="ledger-wrap">
       <div class="dreams-head">
-        <h2>The Library</h2><span class="tag">Watch later · read later — one shelf</span>
+        <h2>The Library</h2><span class="tag">Watch · read · notes — one shelf</span>
       </div>
-      <div class="row" style="flex-wrap:wrap; margin-bottom:8px">
+      <div class="row" id="lib-linkbar" style="flex-wrap:wrap; margin-bottom:8px">
         <input id="lib-url" placeholder="Paste a link — video, article, thread…" style="flex:2; min-width:220px" aria-label="Link URL">
         <input id="lib-title" placeholder="Title (optional)" style="flex:1; min-width:140px" aria-label="Title">
         <select id="lib-kind" aria-label="Type">
@@ -940,6 +955,11 @@
           <option value="read">READ</option>
         </select>
         <button class="primary" id="lib-add">Shelve it</button>
+      </div>
+      <div id="lib-notebar" hidden style="margin-bottom:8px">
+        <div class="row"><input id="note-title" placeholder="Note title" aria-label="Note title"></div>
+        <div class="row"><textarea id="note-body" placeholder="Write it down before it fades…" aria-label="Note body"></textarea></div>
+        <div class="row"><button class="primary" id="note-add" style="flex:1">Save note</button></div>
       </div>
       <div class="filters" id="lib-tabs" style="margin:12px 0 14px"></div>
       <ul class="list" id="lib-list"></ul>
@@ -1900,11 +1920,13 @@
     if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
     return new URL(u); // throws if hopeless
   }
+  let noteEditing = null;
   function renderLibrary() {
     const open = db.library.filter(x => !x.done);
     const TABS = [
       ['watch', 'Watch · ' + open.filter(x => x.kind === 'watch').length],
       ['read', 'Read · ' + open.filter(x => x.kind === 'read').length],
+      ['notes', 'Notes · ' + db.notes.length],
       ['done', 'Finished']
     ];
     $('lib-tabs').innerHTML = TABS.map(([v, l]) =>
@@ -1912,6 +1934,10 @@
     $('lib-tabs').querySelectorAll('button').forEach(b => {
       b.onclick = () => { libTab = b.dataset.t; renderLibrary(); };
     });
+    $('lib-linkbar').hidden = libTab === 'notes';
+    $('lib-notebar').hidden = libTab !== 'notes';
+
+    if (libTab === 'notes') { renderNotes(); return; }
 
     const shown = db.library.filter(x => libTab === 'done' ? x.done : (!x.done && x.kind === libTab));
     const ul = $('lib-list');
@@ -1939,6 +1965,55 @@
       ul.appendChild(li);
     });
   }
+  function renderNotes() {
+    const ul = $('lib-list');
+    ul.innerHTML = db.notes.length ? '' :
+      '<div class="empty" style="padding:40px 0">No notes yet. Write the first one above.</div>';
+    db.notes.forEach(n => {
+      const li = document.createElement('li');
+      li.className = 'note-card';
+      if (noteEditing === n.id) {
+        li.innerHTML =
+          '<div class="row"><input class="ne-title" value="' + esc(n.title || '').replace(/"/g, '&quot;') + '" placeholder="Note title"></div>' +
+          '<div class="row"><textarea class="ne-body">' + esc(n.body || '') + '</textarea></div>' +
+          '<div class="row"><button class="primary ne-save" style="flex:1">Save</button><button class="ne-cancel">Cancel</button></div>';
+        li.querySelector('.ne-save').onclick = () => {
+          n.title = li.querySelector('.ne-title').value.trim();
+          n.body = li.querySelector('.ne-body').value.trim();
+          noteEditing = null;
+          save(); renderLibrary();
+        };
+        li.querySelector('.ne-cancel').onclick = () => { noteEditing = null; renderLibrary(); };
+      } else {
+        li.innerHTML =
+          (n.title ? '<b>' + esc(n.title) + '</b>' : '') +
+          (n.body ? '<p>' + esc(n.body) + '</p>' : '') +
+          '<div class="meta"><span>' + esc(n.when || '') + '</span><span class="grow"></span>' +
+          '<button class="ghost" title="Edit">✎</button>' +
+          '<button class="ghost del" aria-label="Delete note">✕</button></div>';
+        li.querySelector('.ghost').onclick = () => { noteEditing = n.id; renderLibrary(); };
+        li.querySelector('.del').onclick = () => {
+          db.notes = db.notes.filter(x => x.id !== n.id);
+          save(); renderLibrary();
+        };
+      }
+      ul.appendChild(li);
+    });
+  }
+  function addNote() {
+    const title = $('note-title').value.trim();
+    const body = $('note-body').value.trim();
+    if (!title && !body) return;
+    db.notes.unshift({
+      id: uid(), title, body,
+      when: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' · ' +
+            new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    });
+    $('note-title').value = ''; $('note-body').value = '';
+    save(); renderLibrary();
+  }
+  $('note-add').onclick = addNote;
+
   function addLibrary() {
     let url;
     try { url = libNormalize($('lib-url').value.trim()); }
