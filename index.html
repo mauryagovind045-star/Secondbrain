@@ -457,19 +457,26 @@
     font-family:var(--mono); font-size:8.5px; color:var(--faint);
     letter-spacing:.08em; flex:none;
   }
-  .note-page{ max-width:760px; margin:0 auto; }
+  .note-page{ max-width:820px; margin:0 auto; }
+  .note-sheet{
+    background:var(--panel); border:1px solid var(--line-soft);
+    border-radius:var(--radius); padding:38px 48px 60px;
+    min-height:78vh; margin-top:10px; cursor:text;
+  }
   .np-title{
     background:none; border:none; outline:none; width:100%;
     font-family:var(--heads); font-weight:600; font-size:34px;
-    letter-spacing:.04em; color:var(--text); padding:22px 0 6px;
+    letter-spacing:.04em; color:var(--text); padding:0 0 12px;
+    border-bottom:1px solid var(--line-soft); margin-bottom:14px;
   }
   .np-title::placeholder{ color:var(--faint); }
   .np-body{
     background:none; border:none; outline:none; resize:none; width:100%;
-    min-height:65vh; font-family:var(--body); font-weight:300;
+    min-height:62vh; font-family:var(--body); font-weight:300;
     font-size:15px; line-height:1.8; color:var(--text);
-    padding:8px 0 80px;
+    padding:4px 0 40px;
   }
+  @media (max-width:720px){ .note-sheet{ padding:22px 18px 40px; } }
   .np-body::placeholder{ color:var(--faint); }
   .np-title:focus, .np-body:focus,
   .np-title:focus-visible, .np-body:focus-visible{
@@ -993,8 +1000,10 @@
         <button class="ghost" id="np-back" style="font-family:var(--mono);font-size:10px;letter-spacing:.14em">← LIBRARY</button>
         <span class="sync-status" id="np-status" style="margin:0 0 0 auto"></span>
       </div>
-      <input id="np-title" class="np-title" placeholder="Untitled" aria-label="Note title">
-      <textarea id="np-body" class="np-body" placeholder="Write whatever you want. It saves itself." aria-label="Note body"></textarea>
+      <div class="note-sheet" id="note-sheet">
+        <input id="np-title" class="np-title" placeholder="Untitled" aria-label="Note title">
+        <textarea id="np-body" class="np-body" placeholder="Write whatever you want. It saves itself." aria-label="Note body"></textarea>
+      </div>
     </div>
   </div>
 
@@ -2075,6 +2084,14 @@
     renderLibrary();
   };
   $('note-new').onclick = () => openNotePage(null);
+  $('note-sheet').addEventListener('mousedown', e => {
+    if (e.target === e.currentTarget) {
+      e.preventDefault();
+      const b = $('np-body');
+      b.focus();
+      b.setSelectionRange(b.value.length, b.value.length);
+    }
+  });
 
   function addLibrary() {
     let url;
