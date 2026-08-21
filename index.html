@@ -437,21 +437,40 @@
   .lib-item.seen .who a{ color:var(--faint); text-decoration:line-through; }
   .chip.watch{ color:#7da2c1; border-color:rgba(125,162,193,.35); }
   .chip.read{ color:var(--gold); border-color:rgba(200,162,75,.35); }
-  .note-card{
+  .note-row{
+    display:flex; align-items:center; gap:12px;
     background:var(--bg-deep); border:1px solid var(--line-soft);
     border-left:2px solid var(--red-dim); border-radius:3px;
-    padding:12px 14px;
+    padding:12px 14px; cursor:pointer; transition:border-color .15s;
   }
-  .note-card b{ font-weight:500; font-size:14px; display:block; }
-  .note-card p{
-    font-size:13px; color:var(--muted); margin-top:6px;
-    white-space:pre-wrap; overflow-wrap:break-word; line-height:1.6;
+  .note-row:hover{ border-color:var(--line); border-left-color:var(--red); }
+  .note-row .who{ flex:1; min-width:0; }
+  .note-row .who b{
+    font-weight:500; font-size:14px; display:block;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
-  .note-card .meta{
-    display:flex; align-items:center; gap:4px; margin-top:9px;
-    font-family:var(--mono); font-size:8.5px; color:var(--faint); letter-spacing:.1em;
+  .note-row .who small{
+    font-size:12px; color:var(--faint); display:block; margin-top:3px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
-  .note-card .meta .grow{ flex:1; }
+  .note-row .when{
+    font-family:var(--mono); font-size:8.5px; color:var(--faint);
+    letter-spacing:.08em; flex:none;
+  }
+  .note-page{ max-width:760px; margin:0 auto; }
+  .np-title{
+    background:none; border:none; outline:none; width:100%;
+    font-family:var(--heads); font-weight:600; font-size:34px;
+    letter-spacing:.04em; color:var(--text); padding:22px 0 6px;
+  }
+  .np-title::placeholder{ color:var(--faint); }
+  .np-body{
+    background:none; border:none; outline:none; resize:none; width:100%;
+    min-height:65vh; font-family:var(--body); font-weight:300;
+    font-size:15px; line-height:1.8; color:var(--text);
+    padding:8px 0 80px;
+  }
+  .np-body::placeholder{ color:var(--faint); }
 
   /* ---------- ledger page ---------- */
   .ledger-wrap{ max-width:860px; margin:0 auto; }
@@ -957,12 +976,21 @@
         <button class="primary" id="lib-add">Shelve it</button>
       </div>
       <div id="lib-notebar" hidden style="margin-bottom:8px">
-        <div class="row"><input id="note-title" placeholder="Note title" aria-label="Note title"></div>
-        <div class="row"><textarea id="note-body" placeholder="Write it down before it fades…" aria-label="Note body"></textarea></div>
-        <div class="row"><button class="primary" id="note-add" style="flex:1">Save note</button></div>
+        <div class="row"><button class="primary" id="note-new" style="flex:1">+ New note</button></div>
       </div>
       <div class="filters" id="lib-tabs" style="margin:12px 0 14px"></div>
       <ul class="list" id="lib-list"></ul>
+    </div>
+  </div>
+
+  <div id="view-note" hidden>
+    <div class="note-page">
+      <div class="row" style="align-items:center">
+        <button class="ghost" id="np-back" style="font-family:var(--mono);font-size:10px;letter-spacing:.14em">← LIBRARY</button>
+        <span class="sync-status" id="np-status" style="margin:0 0 0 auto"></span>
+      </div>
+      <input id="np-title" class="np-title" placeholder="Untitled" aria-label="Note title">
+      <textarea id="np-body" class="np-body" placeholder="Write whatever you want. It saves itself." aria-label="Note body"></textarea>
     </div>
   </div>
 
@@ -1620,7 +1648,7 @@
   /* ---------- view switching ---------- */
   function showView(name) {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-    ['dash', 'tasks', 'dreams', 'ledger', 'library', 'journal'].forEach(v => { $('view-' + v).hidden = v !== name; });
+    ['dash', 'tasks', 'dreams', 'ledger', 'library', 'journal', 'note'].forEach(v => { $('view-' + v).hidden = v !== name; });
     window.scrollTo(0, 0);
   }
   document.querySelectorAll('.view-btn').forEach(btn => {
@@ -1920,7 +1948,6 @@
     if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
     return new URL(u); // throws if hopeless
   }
-  let noteEditing = null;
   function renderLibrary() {
     const open = db.library.filter(x => !x.done);
     const TABS = [
@@ -1968,51 +1995,82 @@
   function renderNotes() {
     const ul = $('lib-list');
     ul.innerHTML = db.notes.length ? '' :
-      '<div class="empty" style="padding:40px 0">No notes yet. Write the first one above.</div>';
+      '<div class="empty" style="padding:40px 0">No notes yet. Open a blank page above.</div>';
     db.notes.forEach(n => {
       const li = document.createElement('li');
-      li.className = 'note-card';
-      if (noteEditing === n.id) {
-        li.innerHTML =
-          '<div class="row"><input class="ne-title" value="' + esc(n.title || '').replace(/"/g, '&quot;') + '" placeholder="Note title"></div>' +
-          '<div class="row"><textarea class="ne-body">' + esc(n.body || '') + '</textarea></div>' +
-          '<div class="row"><button class="primary ne-save" style="flex:1">Save</button><button class="ne-cancel">Cancel</button></div>';
-        li.querySelector('.ne-save').onclick = () => {
-          n.title = li.querySelector('.ne-title').value.trim();
-          n.body = li.querySelector('.ne-body').value.trim();
-          noteEditing = null;
-          save(); renderLibrary();
-        };
-        li.querySelector('.ne-cancel').onclick = () => { noteEditing = null; renderLibrary(); };
-      } else {
-        li.innerHTML =
-          (n.title ? '<b>' + esc(n.title) + '</b>' : '') +
-          (n.body ? '<p>' + esc(n.body) + '</p>' : '') +
-          '<div class="meta"><span>' + esc(n.when || '') + '</span><span class="grow"></span>' +
-          '<button class="ghost" title="Edit">✎</button>' +
-          '<button class="ghost del" aria-label="Delete note">✕</button></div>';
-        li.querySelector('.ghost').onclick = () => { noteEditing = n.id; renderLibrary(); };
-        li.querySelector('.del').onclick = () => {
-          db.notes = db.notes.filter(x => x.id !== n.id);
-          save(); renderLibrary();
-        };
-      }
+      li.className = 'note-row';
+      const snippet = (n.body || '').replace(/\s+/g, ' ').slice(0, 90);
+      li.innerHTML =
+        '<span class="who"><b>' + (esc(n.title) || 'Untitled') + '</b>' +
+        (snippet ? '<small>' + esc(snippet) + '</small>' : '') + '</span>' +
+        '<span class="when">' + esc(n.when || '') + '</span>' +
+        '<button class="ghost" aria-label="Delete note">✕</button>';
+      li.onclick = () => openNotePage(n.id);
+      li.querySelector('.ghost').onclick = e => {
+        e.stopPropagation();
+        db.notes = db.notes.filter(x => x.id !== n.id);
+        save(); renderLibrary();
+      };
       ul.appendChild(li);
     });
   }
-  function addNote() {
-    const title = $('note-title').value.trim();
-    const body = $('note-body').value.trim();
-    if (!title && !body) return;
-    db.notes.unshift({
-      id: uid(), title, body,
-      when: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' · ' +
-            new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-    });
-    $('note-title').value = ''; $('note-body').value = '';
-    save(); renderLibrary();
+
+  /* ---------- note page editor ---------- */
+  let openNoteId = null;
+  let npTimer = null;
+  const noteStamp = () =>
+    new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' · ' +
+    new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  function npSave(showMsg) {
+    const n = db.notes.find(x => x.id === openNoteId);
+    if (!n) return;
+    n.title = $('np-title').value.trim();
+    n.body = $('np-body').value;
+    save();
+    if (showMsg !== false) {
+      const st = $('np-status');
+      st.textContent = 'SAVED';
+      st.className = 'sync-status ok';
+      clearTimeout(npTimer._msg);
+      npTimer._msg = setTimeout(() => { st.textContent = ''; }, 1200);
+    }
   }
-  $('note-add').onclick = addNote;
+  function openNotePage(id) {
+    if (!id) {
+      const nn = { id: uid(), title: '', body: '', when: noteStamp() };
+      db.notes.unshift(nn);
+      id = nn.id;
+    }
+    openNoteId = id;
+    const n = db.notes.find(x => x.id === id);
+    $('np-title').value = n.title || '';
+    $('np-body').value = n.body || '';
+    $('np-status').textContent = '';
+    showView('note');
+    document.querySelectorAll('.view-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.view === 'library'));
+    $('np-title').focus();
+  }
+  ['np-title', 'np-body'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      clearTimeout(npTimer);
+      npTimer = setTimeout(() => npSave(false), 1200);
+    });
+    $(id).addEventListener('blur', () => npSave(true));
+  });
+  $('np-back').onclick = () => {
+    clearTimeout(npTimer);
+    npSave(false);
+    const n = db.notes.find(x => x.id === openNoteId);
+    if (n && !n.title && !(n.body || '').trim()) {
+      db.notes = db.notes.filter(x => x.id !== openNoteId);
+      save();
+    }
+    openNoteId = null;
+    showView('library');
+    renderLibrary();
+  };
+  $('note-new').onclick = () => openNotePage(null);
 
   function addLibrary() {
     let url;
