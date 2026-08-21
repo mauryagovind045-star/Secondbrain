@@ -470,12 +470,29 @@
     border-bottom:1px solid var(--line-soft); margin-bottom:14px;
   }
   .np-title::placeholder{ color:var(--faint); }
-  .np-body{
-    background:none; border:none; outline:none; resize:none; width:100%;
-    min-height:62vh; font-family:var(--body); font-weight:300;
-    font-size:15px; line-height:1.8; color:var(--text);
-    padding:4px 0 40px;
+  .np-tools{ display:flex; gap:6px; margin:0 0 10px; }
+  .np-tools button{
+    font-family:var(--mono); font-size:11px; letter-spacing:0;
+    padding:5px 11px; color:var(--muted); border-radius:2px;
   }
+  .np-tools button:hover{ color:var(--text); border-color:var(--faint); }
+  .np-body{
+    background:none; border:none; outline:none; width:100%;
+    min-height:60vh; font-family:var(--body); font-weight:300;
+    font-size:15px; line-height:1.8; color:var(--text);
+    padding:4px 0 40px; cursor:text;
+  }
+  .np-body:empty::before{ content:attr(data-placeholder); color:var(--faint); }
+  .np-body b, .np-body strong{ font-weight:600; color:#e8e9ec; }
+  .np-body h2{
+    font-family:var(--heads); font-weight:600; font-size:21px;
+    letter-spacing:.06em; margin:16px 0 6px;
+  }
+  .np-body blockquote{
+    border-left:2px solid var(--red-dim); margin:12px 0;
+    padding:4px 16px; color:var(--muted); font-style:italic;
+  }
+  .np-body p{ margin:0 0 8px; }
   @media (max-width:720px){ .note-sheet{ padding:22px 18px 40px; } }
   .np-body::placeholder{ color:var(--faint); }
   .np-title:focus, .np-body:focus,
@@ -1002,7 +1019,12 @@
       </div>
       <div class="note-sheet" id="note-sheet">
         <input id="np-title" class="np-title" placeholder="Untitled" aria-label="Note title">
-        <textarea id="np-body" class="np-body" placeholder="Write whatever you want. It saves itself." aria-label="Note body"></textarea>
+        <div class="np-tools">
+          <button data-cmd="bold" title="Bold (⌘B)"><b>B</b></button>
+          <button data-cmd="h" title="Heading">H</button>
+          <button data-cmd="quote" title="Quote">❝</button>
+        </div>
+        <div id="np-body" class="np-body" contenteditable="true" data-placeholder="Write whatever you want. It saves itself." aria-label="Note body"></div>
       </div>
     </div>
   </div>
@@ -2012,7 +2034,9 @@
     db.notes.forEach(n => {
       const li = document.createElement('li');
       li.className = 'note-row';
-      const snippet = (n.body || '').replace(/\s+/g, ' ').slice(0, 90);
+      const tmp = document.createElement('div');
+      tmp.innerHTML = n.body || '';
+      const snippet = (n.rich ? tmp.textContent : (n.body || '')).replace(/\s+/g, ' ').trim().slice(0, 90);
       li.innerHTML =
         '<span class="who"><b>' + (esc(n.title) || 'Untitled') + '</b>' +
         (snippet ? '<small>' + esc(snippet) + '</small>' : '') + '</span>' +
@@ -2038,7 +2062,8 @@
     const n = db.notes.find(x => x.id === openNoteId);
     if (!n) return;
     n.title = $('np-title').value.trim();
-    n.body = $('np-body').value;
+    n.body = $('np-body').innerHTML;
+    n.rich = true;
     save();
     if (showMsg !== false) {
       const st = $('np-status');
@@ -2057,7 +2082,9 @@
     openNoteId = id;
     const n = db.notes.find(x => x.id === id);
     $('np-title').value = n.title || '';
-    $('np-body').value = n.body || '';
+    $('np-body').innerHTML = n.rich
+      ? (n.body || '')
+      : esc(n.body || '').replace(/\n/g, '<br>');
     $('np-status').textContent = '';
     showView('note');
     document.querySelectorAll('.view-btn').forEach(b =>
@@ -2075,7 +2102,7 @@
     clearTimeout(npTimer);
     npSave(false);
     const n = db.notes.find(x => x.id === openNoteId);
-    if (n && !n.title && !(n.body || '').trim()) {
+    if (n && !n.title && !$('np-body').textContent.trim()) {
       db.notes = db.notes.filter(x => x.id !== openNoteId);
       save();
     }
@@ -2089,8 +2116,31 @@
       e.preventDefault();
       const b = $('np-body');
       b.focus();
-      b.setSelectionRange(b.value.length, b.value.length);
+      const r = document.createRange();
+      r.selectNodeContents(b); r.collapse(false);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
     }
+  });
+  // formatting toolbar — keep selection, apply command
+  document.querySelectorAll('.np-tools button').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.onclick = () => {
+      const cmd = btn.dataset.cmd;
+      if (cmd === 'bold') document.execCommand('bold');
+      else {
+        const want = cmd === 'h' ? 'h2' : 'blockquote';
+        const cur = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+        document.execCommand('formatBlock', false, cur === want ? '<p>' : '<' + want + '>');
+      }
+      $('np-body').focus();
+      clearTimeout(npTimer);
+      npTimer = setTimeout(() => npSave(false), 800);
+    };
+  });
+  // paste as plain text so outside formatting never leaks in
+  $('np-body').addEventListener('paste', e => {
+    e.preventDefault();
+    document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
   });
 
   function addLibrary() {
