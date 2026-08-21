@@ -471,6 +471,10 @@
     padding:8px 0 80px;
   }
   .np-body::placeholder{ color:var(--faint); }
+  .np-title:focus, .np-body:focus,
+  .np-title:focus-visible, .np-body:focus-visible{
+    outline:none; border:none; box-shadow:none;
+  }
 
   /* ---------- ledger page ---------- */
   .ledger-wrap{ max-width:860px; margin:0 auto; }
