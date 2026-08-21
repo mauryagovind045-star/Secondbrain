@@ -493,6 +493,16 @@
     padding:4px 16px; color:var(--muted); font-style:italic;
   }
   .np-body p{ margin:0 0 8px; }
+  .np-body img{
+    max-width:100%; display:block; border-radius:4px;
+    border:1px solid var(--line-soft); margin:12px 0;
+  }
+  .np-body ul, .np-body ol{ margin:8px 0 8px 22px; }
+  .np-body li{ margin-bottom:4px; }
+  .np-body hr{
+    border:none; height:1px; background:var(--line);
+    margin:18px 0;
+  }
   @media (max-width:720px){ .note-sheet{ padding:22px 18px 40px; } }
   .np-body::placeholder{ color:var(--faint); }
   .np-title:focus, .np-body:focus,
@@ -1023,6 +1033,10 @@
           <button data-cmd="bold" title="Bold (⌘B)"><b>B</b></button>
           <button data-cmd="h" title="Heading">H</button>
           <button data-cmd="quote" title="Quote">❝</button>
+          <button data-cmd="list" title="Bullet list">•—</button>
+          <button data-cmd="hr" title="Divider">···</button>
+          <button data-cmd="img" title="Insert image — or just paste a screenshot">IMG</button>
+          <input type="file" id="np-img" accept="image/*" hidden>
         </div>
         <div id="np-body" class="np-body" contenteditable="true" data-placeholder="Write whatever you want. It saves itself." aria-label="Note body"></div>
       </div>
@@ -2064,7 +2078,12 @@
     n.title = $('np-title').value.trim();
     n.body = $('np-body').innerHTML;
     n.rich = true;
-    save();
+    if (!save()) {
+      const st = $('np-status');
+      st.textContent = 'STORAGE FULL — REMOVE AN IMAGE OR TWO';
+      st.className = 'sync-status err';
+      return;
+    }
     if (showMsg !== false) {
       const st = $('np-status');
       st.textContent = 'SAVED';
@@ -2122,25 +2141,61 @@
     }
   });
   // formatting toolbar — keep selection, apply command
+  let npRange = null;
+  const npKeepRange = () => {
+    const sel = getSelection();
+    if (sel.rangeCount && $('np-body').contains(sel.anchorNode)) npRange = sel.getRangeAt(0).cloneRange();
+  };
+  const npRestoreRange = () => {
+    $('np-body').focus();
+    if (npRange) {
+      const sel = getSelection();
+      sel.removeAllRanges(); sel.addRange(npRange);
+    }
+  };
+  const npQueueSave = () => { clearTimeout(npTimer); npTimer = setTimeout(() => npSave(false), 800); };
+  function npInsertImage(file) {
+    shrinkImage(file, url => {
+      npRestoreRange();
+      document.execCommand('insertHTML', false, '<img src="' + url + '"><br>');
+      npQueueSave();
+    });
+  }
   document.querySelectorAll('.np-tools button').forEach(btn => {
-    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('mousedown', e => { e.preventDefault(); npKeepRange(); });
     btn.onclick = () => {
       const cmd = btn.dataset.cmd;
+      if (cmd === 'img') { $('np-img').click(); return; }
       if (cmd === 'bold') document.execCommand('bold');
+      else if (cmd === 'list') document.execCommand('insertUnorderedList');
+      else if (cmd === 'hr') document.execCommand('insertHorizontalRule');
       else {
         const want = cmd === 'h' ? 'h2' : 'blockquote';
         const cur = (document.queryCommandValue('formatBlock') || '').toLowerCase();
         document.execCommand('formatBlock', false, cur === want ? '<p>' : '<' + want + '>');
       }
       $('np-body').focus();
-      clearTimeout(npTimer);
-      npTimer = setTimeout(() => npSave(false), 800);
+      npQueueSave();
     };
   });
-  // paste as plain text so outside formatting never leaks in
+  $('np-img').onchange = e => {
+    const f = e.target.files[0];
+    if (f) npInsertImage(f);
+    e.target.value = '';
+  };
+  // paste: screenshots become images, everything else lands as plain text
   $('np-body').addEventListener('paste', e => {
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    for (const it of items) {
+      if (it.type && it.type.indexOf('image/') === 0) {
+        e.preventDefault();
+        npKeepRange();
+        npInsertImage(it.getAsFile());
+        return;
+      }
+    }
     e.preventDefault();
-    document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
+    document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
   });
 
   function addLibrary() {
