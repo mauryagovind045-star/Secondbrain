@@ -503,6 +503,30 @@
     border:none; height:1px; background:var(--line);
     margin:18px 0;
   }
+  .np-body a{ color:var(--gold); text-decoration:none; border-bottom:1px solid rgba(200,162,75,.35); cursor:pointer; }
+  .np-body a:hover{ border-bottom-color:var(--gold); }
+  .np-body a.np-link{
+    display:flex; align-items:center; gap:12px; margin:12px 0;
+    padding:11px 14px; border:1px solid var(--line-soft); border-radius:4px;
+    background:var(--bg-deep); color:var(--text); font-weight:400;
+    cursor:pointer; user-select:none; text-decoration:none;
+  }
+  .np-body a.np-link:hover{ border-color:var(--gold); }
+  .np-body a.np-link::before{
+    content:'↗'; font-family:var(--mono); font-size:13px; color:var(--gold); flex:none;
+  }
+  .np-body a.np-link .lt{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .np-body a.np-link .lh{
+    font-family:var(--mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--faint); flex:none; max-width:40%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .np-linkbar{
+    display:flex; gap:6px; margin:0 0 10px; align-items:center;
+  }
+  .np-linkbar[hidden]{ display:none; }
+  .np-linkbar input{ margin:0; font-size:12.5px; padding:7px 10px; }
+  .np-linkbar input.url{ flex:2; }
+  .np-linkbar input.label{ flex:1; }
   @media (max-width:720px){ .note-sheet{ padding:22px 18px 40px; } }
   .np-body::placeholder{ color:var(--faint); }
   .np-title:focus, .np-body:focus,
@@ -1036,7 +1060,13 @@
           <button data-cmd="list" title="Bullet list">•—</button>
           <button data-cmd="hr" title="Divider">···</button>
           <button data-cmd="img" title="Insert image — or just paste a screenshot">IMG</button>
+          <button data-cmd="link" title="Add a link — or just paste a URL">LINK</button>
           <input type="file" id="np-img" accept="image/*" hidden>
+        </div>
+        <div class="np-linkbar" id="np-linkbar" hidden>
+          <input class="url" id="np-link-url" placeholder="https://… (Enter to add, Esc to cancel)" aria-label="Link URL">
+          <input class="label" id="np-link-label" placeholder="Label (optional)" aria-label="Link label">
+          <button class="primary" id="np-link-add">Add</button>
         </div>
         <div id="np-body" class="np-body" contenteditable="true" data-placeholder="Write whatever you want. It saves itself." aria-label="Note body"></div>
       </div>
@@ -2105,6 +2135,7 @@
       ? (n.body || '')
       : esc(n.body || '').replace(/\n/g, '<br>');
     $('np-status').textContent = '';
+    $('np-linkbar').hidden = true;
     showView('note');
     document.querySelectorAll('.view-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.view === 'library'));
@@ -2161,11 +2192,76 @@
       npQueueSave();
     });
   }
+  // links: a card that opens in a new tab, or wrap the selected text
+  const npLinkHost = href => {
+    try { return new URL(href).hostname.replace(/^www\./, ''); } catch (e) { return href; }
+  };
+  const npLinkTitle = href => {
+    try {
+      const u = new URL(href);
+      let t = u.hostname.replace(/^www\./, '') + decodeURIComponent(u.pathname).replace(/\/$/, '');
+      if (u.search && t.length < 50) t += u.search;
+      return t.length > 70 ? t.slice(0, 68) + '…' : t;
+    } catch (e) { return href; }
+  };
+  const npNormalizeUrl = raw => {
+    raw = (raw || '').trim();
+    if (!raw) return null;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) raw = 'https://' + raw;
+    try { const u = new URL(raw); return /^https?:$/.test(u.protocol) ? u.href : null; }
+    catch (e) { return null; }
+  };
+  function npInsertLink(href, label) {
+    npRestoreRange();
+    const sel = getSelection();
+    const hasText = npRange && !npRange.collapsed && npRange.toString().trim();
+    if (hasText && !label) {
+      document.execCommand('createLink', false, href);
+      $('np-body').querySelectorAll('a[href="' + href.replace(/"/g, '&quot;') + '"]').forEach(a => {
+        a.target = '_blank'; a.rel = 'noopener';
+      });
+    } else {
+      const text = esc(label || npLinkTitle(href));
+      document.execCommand('insertHTML', false,
+        '<a class="np-link" href="' + esc(href) + '" target="_blank" rel="noopener" contenteditable="false">' +
+        '<span class="lt">' + text + '</span><span class="lh">' + esc(npLinkHost(href)) + '</span></a><p><br></p>');
+    }
+    npQueueSave();
+  }
+  const npLinkbarHide = () => { $('np-linkbar').hidden = true; $('np-link-url').value = ''; $('np-link-label').value = ''; };
+  const npLinkbarSubmit = () => {
+    const href = npNormalizeUrl($('np-link-url').value);
+    if (!href) { $('np-link-url').focus(); return; }
+    const label = $('np-link-label').value.trim();
+    npLinkbarHide();
+    npInsertLink(href, label);
+  };
+  $('np-link-add').onclick = npLinkbarSubmit;
+  ['np-link-url', 'np-link-label'].forEach(id => $(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); npLinkbarSubmit(); }
+    if (e.key === 'Escape') { npLinkbarHide(); $('np-body').focus(); }
+  }));
+  // clicking a link inside the editor opens it (contenteditable swallows it otherwise)
+  $('np-body').addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (a && $('np-body').contains(a)) {
+      e.preventDefault();
+      window.open(a.href, '_blank', 'noopener');
+    }
+  });
   document.querySelectorAll('.np-tools button').forEach(btn => {
     btn.addEventListener('mousedown', e => { e.preventDefault(); npKeepRange(); });
     btn.onclick = () => {
       const cmd = btn.dataset.cmd;
       if (cmd === 'img') { $('np-img').click(); return; }
+      if (cmd === 'link') {
+        const bar = $('np-linkbar');
+        if (!bar.hidden) { npLinkbarHide(); $('np-body').focus(); return; }
+        bar.hidden = false;
+        $('np-link-label').value = (npRange && !npRange.collapsed) ? npRange.toString().trim() : '';
+        $('np-link-url').focus();
+        return;
+      }
       if (cmd === 'bold') document.execCommand('bold');
       else if (cmd === 'list') document.execCommand('insertUnorderedList');
       else if (cmd === 'hr') document.execCommand('insertHorizontalRule');
@@ -2195,7 +2291,14 @@
       }
     }
     e.preventDefault();
-    document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+    const text = e.clipboardData.getData('text/plain');
+    const lone = text.trim();
+    if (lone && !/\s/.test(lone) && /^https?:\/\/\S+$/i.test(lone) && npNormalizeUrl(lone)) {
+      npKeepRange();
+      npInsertLink(npNormalizeUrl(lone), '');
+      return;
+    }
+    document.execCommand('insertText', false, text);
   });
 
   function addLibrary() {
