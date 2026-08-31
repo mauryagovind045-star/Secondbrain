@@ -389,6 +389,18 @@
   .j-label.dawn{ color:var(--gold); }
   .j-label.dusk{ color:#7da2c1; }
   .j-label.mind{ color:var(--muted); }
+  .j-label.week{ color:#a78bc9; }
+  .j-label.month{ color:var(--gold); }
+  .j-date{ display:flex; align-items:baseline; gap:10px; }
+  .j-date .j-meta{
+    font-family:var(--heads); font-weight:400; font-size:9px;
+    letter-spacing:.14em; color:var(--faint); margin-left:auto;
+  }
+  .j-tabs{ margin:0 0 14px; }
+  .j-intro{
+    font-size:12.5px; color:var(--faint); margin:-4px 0 14px;
+    font-style:italic;
+  }
   .j-edit{ min-height:96px; margin-bottom:8px; font-size:13px; }
   .j-label .ghost{ margin-left:auto; font-size:11px; }
   .j-label .saved{
@@ -1076,9 +1088,15 @@
   <div id="view-journal" hidden>
     <div class="journal-wrap">
       <div class="dreams-head">
-        <h2>The Journal</h2><span class="tag">Dawn and dusk · every day</span>
+        <h2>The Journal</h2><span class="tag" id="j-tag">Dawn and dusk · every day</span>
         <span class="count" id="j-streak" style="margin-left:auto"></span>
       </div>
+      <div class="filters j-tabs" id="j-tabs">
+        <button data-jtab="day" class="active">Daily</button>
+        <button data-jtab="week">Weekly review</button>
+        <button data-jtab="month">Monthly review</button>
+      </div>
+      <div class="j-intro" id="j-intro" hidden></div>
       <div id="journal-list"></div>
     </div>
   </div>
@@ -1103,12 +1121,16 @@
   const todayKey = (d = new Date()) =>
     d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const jGuard = () => { // weekly / monthly review stores
+    if (!db.reviews || typeof db.reviews !== 'object' || Array.isArray(db.reviews)) db.reviews = {};
+    ['week', 'month'].forEach(k => { if (!db.reviews[k] || typeof db.reviews[k] !== 'object' || Array.isArray(db.reviews[k])) db.reviews[k] = {}; });
+  };
 
   const VOW_DEFAULTS = () => ([
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {} };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} } };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -1121,6 +1143,7 @@
   if (!Array.isArray(db.pomo)) db.pomo = [];
   if (!Array.isArray(db.library)) db.library = [];
   if (!db.journal || typeof db.journal !== 'object' || Array.isArray(db.journal)) db.journal = {};
+  jGuard();
   if (!db.ui) db.ui = { vowsOpen: true };
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
@@ -1905,7 +1928,67 @@
     ]},
     mind: { icon: '✦', cls: 'mind', title: 'Mind', qs: [
       { key: 'dump', label: 'Dump anything — thoughts, rants, ideas, whatever needs out', n: 1, area: true }
+    ]},
+    week: { icon: '◈', cls: 'week', title: 'Weekly review', qs: [
+      { key: 'wins', label: 'Three wins this week', n: 3 },
+      { key: 'stuck', label: 'What got in the way?', n: 1, area: true },
+      { key: 'lesson', label: 'The one lesson worth keeping', n: 1 },
+      { key: 'next', label: 'Three priorities for next week', n: 3 }
+    ]},
+    month: { icon: '◆', cls: 'month', title: 'Monthly review', qs: [
+      { key: 'wins', label: 'Biggest wins of the month', n: 3 },
+      { key: 'short', label: 'Where did I fall short?', n: 1, area: true },
+      { key: 'lessons', label: 'What did this month teach me?', n: 1, area: true },
+      { key: 'next', label: 'Three goals for next month', n: 3 },
+      { key: 'word', label: 'This month in one word', n: 1 }
     ]}
+  };
+  const W_EMPTY = () => ({ wins: ['', '', ''], stuck: '', lesson: '', next: ['', '', ''] });
+  const M_EMPTY = () => ({ wins: ['', '', ''], short: '', lessons: '', next: ['', '', ''], word: '' });
+  // period keys: weeks start on Monday, months are YYYY-MM
+  const weekKey = (d = new Date()) => {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+    return todayKey(x);
+  };
+  const monthKey = (d = new Date()) => todayKey(d).slice(0, 7);
+  const J_STORES = {
+    day:   { get: () => db.journal,       empty: J_EMPTY, sections: ['morning', 'evening', 'mind'], now: todayKey, limit: 60,
+             tag: 'Dawn and dusk · every day', intro: '' },
+    week:  { get: () => db.reviews.week,  empty: W_EMPTY, sections: ['week'],  now: weekKey,  limit: 26,
+             tag: 'Every Sunday · look back, aim forward',
+             intro: 'Sit down once a week. Ten minutes. What moved, what stalled, what deserves next week.' },
+    month: { get: () => db.reviews.month, empty: M_EMPTY, sections: ['month'], now: monthKey, limit: 24,
+             tag: 'First of the month · the long view',
+             intro: 'Zoom out. A month is long enough to see patterns and short enough to change them.' }
+  };
+  let jTab = 'day';
+  const jAny = (e, sec) => !!e && sec.qs.some(q => (q.n > 1 ? (e[q.key] || []) : [e[q.key]]).some(x => (x || '').trim()));
+  const jDaysIn = (key, kind) => { // how many days of this period have a journal entry
+    const d = new Date(key.length === 7 ? key + '-01T00:00:00' : key + 'T00:00:00');
+    const end = kind === 'month' ? new Date(d.getFullYear(), d.getMonth() + 1, 0) : new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6);
+    const today = todayKey();
+    let n = 0, total = 0;
+    for (const x = new Date(d); x <= end; x.setDate(x.getDate() + 1)) {
+      const k = todayKey(x);
+      if (k > today) break;
+      total++;
+      if (jHas(db.journal[k])) n++;
+    }
+    return n + '/' + total + ' days journaled';
+  };
+  const jPeriodLabel = (key, kind, isNow) => {
+    if (kind === 'day') {
+      const nice = new Date(key + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      return isNow ? '<em>Today</em> · ' + nice : nice;
+    }
+    if (kind === 'month') {
+      const nice = new Date(key + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      return isNow ? '<em>This month</em> · ' + nice : nice;
+    }
+    const a = new Date(key + 'T00:00:00'), b = new Date(a); b.setDate(a.getDate() + 6);
+    const f = x => x.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    return (isNow ? '<em>This week</em> · ' : 'Week of ') + f(a) + ' – ' + f(b);
   };
   const jEditing = {};
   function jMigrate() {
@@ -1928,12 +2011,14 @@
     while (jHas(db.journal[todayKey(d)])) { s++; d.setDate(d.getDate() - 1); }
     return s;
   }
-  function jSection(k, sk, isToday) {
+  function jSection(k, sk, isToday, kind = 'day') {
     const sec = J_SECTIONS[sk];
-    const e = Object.assign(J_EMPTY(), db.journal[k] || {});
+    const st = J_STORES[kind], store = st.get();
+    const e = Object.assign(st.empty(), store[k] || {});
     const wrap = document.createElement('div');
     wrap.className = 'j-block';
-    const editing = isToday || jEditing[k + sk];
+    const ek = kind + k + sk;
+    const editing = isToday || jEditing[ek];
 
     if (editing) {
       let html = '<div class="j-label ' + sec.cls + '">' + sec.icon + ' ' + sec.title + '<span class="saved"></span></div>';
@@ -1952,22 +2037,21 @@
       html += '<button class="j-save">Save</button>';
       wrap.innerHTML = html;
       const doSave = quiet => {
-        if (!db.journal[k]) db.journal[k] = J_EMPTY();
-        const entry = Object.assign(J_EMPTY(), db.journal[k]);
+        const entry = Object.assign(st.empty(), store[k] || {});
         wrap.querySelectorAll('[data-q]').forEach(inp => {
           const q = inp.dataset.q, i = +inp.dataset.i;
           if (Array.isArray(entry[q])) entry[q][i] = inp.value.trim();
           else entry[q] = inp.value.trim();
         });
-        db.journal[k] = entry;
+        store[k] = entry;
         save();
-        $('j-streak').textContent = jStreak() + '-day streak';
+        jCount();
         if (!quiet) {
           const s = wrap.querySelector('.saved');
           s.textContent = 'SAVED';
           setTimeout(() => { s.textContent = ''; }, 1500);
         }
-        if (!isToday) { jEditing[k + sk] = false; renderJournal(); }
+        if (!isToday) { jEditing[ek] = false; renderJournal(); }
       };
       wrap.querySelector('.j-save').onclick = () => doSave(false);
       if (isToday) wrap.querySelectorAll('[data-q]').forEach(inp =>
@@ -1988,37 +2072,49 @@
       });
       if (!any) html += '<div class="j-text dim">—</div>';
       wrap.innerHTML = html;
-      wrap.querySelector('.ghost').onclick = () => { jEditing[k + sk] = true; renderJournal(); };
+      wrap.querySelector('.ghost').onclick = () => { jEditing[ek] = true; renderJournal(); };
     }
     return wrap;
   }
+  function jCount() {
+    if (jTab === 'day') { $('j-streak').textContent = jStreak() + '-day streak'; return; }
+    const st = J_STORES[jTab], sec = J_SECTIONS[st.sections[0]];
+    const n = Object.values(st.get()).filter(e => jAny(e, sec)).length;
+    $('j-streak').textContent = n + (jTab === 'week' ? ' week' : ' month') + (n === 1 ? '' : 's') + ' reviewed';
+  }
   function renderJournal() {
-    jMigrate();
+    jMigrate(); jGuard();
     const box = $('journal-list');
     box.innerHTML = '';
-    const today = todayKey();
-    const dates = [...new Set([today, ...Object.keys(db.journal)])]
-      .filter(k => k <= today)
+    const st = J_STORES[jTab], store = st.get();
+    $('j-tag').textContent = st.tag;
+    $('j-intro').textContent = st.intro;
+    $('j-intro').hidden = !st.intro;
+    document.querySelectorAll('#j-tabs button').forEach(b => b.classList.toggle('active', b.dataset.jtab === jTab));
+    const now = st.now();
+    const keys = [...new Set([now, ...Object.keys(store)])]
+      .filter(k => k <= now)
       .sort().reverse();
-    dates.slice(0, 60).forEach(k => {
-      const isToday = k === today;
+    keys.slice(0, st.limit).forEach(k => {
+      const isNow = k === now;
       const card = document.createElement('div');
-      card.className = 'j-day' + (isToday ? ' today' : '');
+      card.className = 'j-day' + (isNow ? ' today' : '');
       const head = document.createElement('div');
       head.className = 'j-date';
-      const nice = new Date(k + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-      head.innerHTML = isToday ? '<em>Today</em> · ' + nice : nice;
+      head.innerHTML = jPeriodLabel(k, jTab, isNow) +
+        (jTab === 'day' ? '' : '<span class="j-meta">' + jDaysIn(k, jTab) + '</span>');
       card.appendChild(head);
-      card.appendChild(jSection(k, 'morning', isToday));
-      card.appendChild(jSection(k, 'evening', isToday));
-      card.appendChild(jSection(k, 'mind', isToday));
+      st.sections.forEach(sk => card.appendChild(jSection(k, sk, isNow, jTab)));
       box.appendChild(card);
     });
-    if (dates.length > 60) {
-      box.insertAdjacentHTML('beforeend', '<div class="empty">+ ' + (dates.length - 60) + ' older days kept in the vault</div>');
+    if (keys.length > st.limit) {
+      const what = jTab === 'day' ? 'days' : jTab === 'week' ? 'weeks' : 'months';
+      box.insertAdjacentHTML('beforeend', '<div class="empty">+ ' + (keys.length - st.limit) + ' older ' + what + ' kept in the vault</div>');
     }
-    $('j-streak').textContent = jStreak() + '-day streak';
+    jCount();
   }
+  document.querySelectorAll('#j-tabs button').forEach(b =>
+    b.onclick = () => { jTab = b.dataset.jtab; renderJournal(); });
 
   /* ---------- the library (watch / read later) ---------- */
   let libTab = 'watch';
@@ -2367,7 +2463,7 @@
     if (f.truncated) text = await (await fetch(f.raw_url)).text();
     const data = JSON.parse(text);
     if (!data || !Array.isArray(data.tasks)) throw new Error('Cloud copy is not a Sanctum vault.');
-    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], journal: {}, ui: { vowsOpen: true } }, data);
+    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, ui: { vowsOpen: true } }, data);
     if (!db.ui) db.ui = { vowsOpen: true };
     save(); renderAll(); applyVowsFold();
     sync.last = 'pulled ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -2461,7 +2557,7 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], journal: {} }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} } }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
@@ -2470,6 +2566,7 @@
         if (!Array.isArray(db.pomo)) db.pomo = [];
         if (!Array.isArray(db.library)) db.library = [];
         if (!db.journal || typeof db.journal !== 'object' || Array.isArray(db.journal)) db.journal = {};
+        jGuard();
         save(); renderAll();
       } catch (err) { alert('That file is not a valid Sanctum backup.'); }
     };
