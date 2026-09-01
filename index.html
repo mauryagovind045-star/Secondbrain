@@ -778,6 +778,37 @@
     font-family:var(--mono); font-size:11.5px; color:var(--text); flex:none;
   }
 
+  /* ---------- credit book ---------- */
+  .credit-head{
+    display:flex; align-items:baseline; gap:10px; margin:26px 0 4px;
+    padding-top:18px; border-top:1px solid var(--line);
+  }
+  .credit-head h3{
+    font-family:var(--heads); font-weight:600; font-size:16px;
+    letter-spacing:.14em; text-transform:uppercase;
+  }
+  .credit-head .tag{
+    font-family:var(--mono); font-size:9px; color:var(--faint);
+    letter-spacing:.14em; text-transform:uppercase;
+  }
+  .exp-item .who{
+    font-size:13px; font-weight:500; flex:none; max-width:130px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .exp-item.settled .who, .exp-item.settled .txt{ color:var(--faint); }
+  .exp-item.settled .amt{ color:var(--faint); text-decoration:line-through; }
+  .exp-item .paid{
+    font-family:var(--mono); font-size:8px; letter-spacing:.1em;
+    color:var(--ok); flex:none; text-transform:uppercase;
+  }
+  .exp-item .mark{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.1em;
+    padding:4px 9px; color:var(--muted); border-radius:2px; flex:none;
+  }
+  .exp-item .mark:hover{ color:var(--ok); border-color:var(--ok); }
+  .cat-pill.owe{ color:var(--gold); border-color:rgba(200,162,75,.35); }
+  .cat-pill.owe b{ color:var(--gold); }
+
   .empty{
     font-family:var(--mono); font-size:10.5px; color:var(--faint);
     letter-spacing:.12em; text-transform:uppercase;
@@ -1032,6 +1063,20 @@
       <div class="exp-sum" id="ledger-sum"></div>
       <div class="cat-row" id="ledger-cats"></div>
       <ul class="list" id="ledger-full"></ul>
+
+      <div class="credit-head">
+        <h3>The Credit Book</h3><span class="tag">Money given out · who owes you</span>
+      </div>
+      <div class="row" style="flex-wrap:wrap; margin:12px 0 4px">
+        <input id="cr-amt" type="number" min="0" placeholder="₹" aria-label="Credit amount" style="max-width:110px">
+        <input id="cr-who" placeholder="Given to whom?" aria-label="Given to" style="max-width:180px">
+        <input id="cr-note" placeholder="For what? (optional)" aria-label="Credit note" style="flex:1; min-width:140px">
+        <input id="cr-date" type="date" aria-label="Credit date" title="Date (leave empty for today)" style="max-width:140px">
+        <button class="primary" id="cr-add">Given</button>
+      </div>
+      <div class="exp-sum" id="credit-sum" hidden></div>
+      <div class="cat-row" id="credit-pills"></div>
+      <ul class="list" id="credit-list"></ul>
     </div>
   </div>
 
@@ -1130,7 +1175,7 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} } };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} } };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -1139,6 +1184,7 @@
   if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
   if (!Array.isArray(db.inbox)) db.inbox = [];
   if (!Array.isArray(db.expenses)) db.expenses = [];
+  if (!Array.isArray(db.credits)) db.credits = [];
   if (!Array.isArray(db.dreams)) db.dreams = [];
   if (!Array.isArray(db.pomo)) db.pomo = [];
   if (!Array.isArray(db.library)) db.library = [];
@@ -1737,6 +1783,66 @@
     $(p + '-note').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(p); });
     $(p + '-amt').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(p); });
   });
+
+  /* ---------- the credit book (money given out) ---------- */
+  function renderCredits() {
+    if (!Array.isArray(db.credits)) db.credits = [];
+    const open = db.credits.filter(c => !c.settled);
+    const out = open.reduce((s, c) => s + c.amt, 0);
+
+    const sum = $('credit-sum');
+    sum.hidden = !db.credits.length;
+    sum.innerHTML =
+      '<span>OUTSTANDING <b>' + rupee(out) + '</b></span>' +
+      '<span>' + open.length + ' OPEN</span>' +
+      '<span>EVER GIVEN <b>' + rupee(db.credits.reduce((s, c) => s + c.amt, 0)) + '</b></span>';
+
+    const per = {};
+    open.forEach(c => { per[c.who] = (per[c.who] || 0) + c.amt; });
+    $('credit-pills').innerHTML = Object.entries(per)
+      .sort((a, b) => b[1] - a[1])
+      .map(([w, v]) => '<span class="cat-pill owe">' + esc(w) + ' <b>' + rupee(v) + '</b></span>')
+      .join('');
+
+    const ul = $('credit-list');
+    ul.innerHTML = db.credits.length ? '' : '<div class="empty">No credit given. Keep it that way if you can.</div>';
+    const rows = [...db.credits].sort((a, b) =>
+      (!!a.settled - !!b.settled) || b.date.localeCompare(a.date));
+    rows.forEach(c => {
+      const li = document.createElement('li');
+      li.className = 'exp-item' + (c.settled ? ' settled' : '');
+      li.innerHTML =
+        '<span class="when">' + shortDate(c.date) + '</span>' +
+        '<span class="who">' + esc(c.who) + '</span>' +
+        '<span class="txt">' + esc(c.note || '—') + '</span>' +
+        (c.settled
+          ? '<span class="paid">PAID ' + shortDate(c.settled) + '</span>'
+          : '') +
+        '<span class="amt">' + rupee(c.amt) + '</span>' +
+        '<button class="mark">' + (c.settled ? 'UNDO' : 'PAID BACK') + '</button>' +
+        '<button class="ghost" aria-label="Delete credit">✕</button>';
+      li.querySelector('.mark').onclick = () => {
+        c.settled = c.settled ? null : todayKey();
+        save(); renderCredits();
+      };
+      li.querySelector('.ghost').onclick = () => {
+        db.credits = db.credits.filter(x => x.id !== c.id);
+        save(); renderCredits();
+      };
+      ul.appendChild(li);
+    });
+  }
+  function addCredit() {
+    const amt = parseInt($('cr-amt').value, 10);
+    const who = $('cr-who').value.trim();
+    if (isNaN(amt) || amt <= 0 || !who) { (!who ? $('cr-who') : $('cr-amt')).focus(); return; }
+    db.credits.unshift({ id: uid(), amt, who, note: $('cr-note').value.trim(), date: $('cr-date').value || todayKey(), settled: null });
+    ['cr-amt', 'cr-who', 'cr-note', 'cr-date'].forEach(i => { $(i).value = ''; });
+    save(); renderCredits();
+  }
+  $('cr-add').onclick = addCredit;
+  ['cr-amt', 'cr-who', 'cr-note'].forEach(i =>
+    $(i).addEventListener('keydown', e => { if (e.key === 'Enter') addCredit(); }));
 
   /* ---------- vows fold ---------- */
   const vowsFold = $('vows-fold');
@@ -2463,7 +2569,7 @@
     if (f.truncated) text = await (await fetch(f.raw_url)).text();
     const data = JSON.parse(text);
     if (!data || !Array.isArray(data.tasks)) throw new Error('Cloud copy is not a Sanctum vault.');
-    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, ui: { vowsOpen: true } }, data);
+    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, ui: { vowsOpen: true } }, data);
     if (!db.ui) db.ui = { vowsOpen: true };
     save(); renderAll(); applyVowsFold();
     sync.last = 'pulled ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -2557,11 +2663,12 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} } }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} } }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
         if (!Array.isArray(db.expenses)) db.expenses = [];
+        if (!Array.isArray(db.credits)) db.credits = [];
         if (!Array.isArray(db.dreams)) db.dreams = [];
         if (!Array.isArray(db.pomo)) db.pomo = [];
         if (!Array.isArray(db.library)) db.library = [];
@@ -2575,7 +2682,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderDreams(); renderLibrary(); renderJournal(); renderStats();
+    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderCredits(); renderDreams(); renderLibrary(); renderJournal(); renderStats();
   }
   renderAll();
 })();
