@@ -401,6 +401,21 @@
     font-size:12.5px; color:var(--faint); margin:-4px 0 14px;
     font-style:italic;
   }
+  .mg-row{
+    display:flex; align-items:center; gap:10px;
+    padding:7px 2px; border-bottom:1px solid var(--line-soft);
+  }
+  .mg-row:last-of-type{ border-bottom:none; }
+  .mg-check{
+    font-family:var(--mono); font-size:11px; width:24px; height:24px;
+    flex:none; border-radius:2px; color:var(--faint); padding:0;
+  }
+  .mg-check:hover{ color:var(--gold); border-color:var(--gold); }
+  .mg-row.done .mg-check{ color:var(--ok); border-color:rgba(79,143,95,.5); }
+  .mg-row .mg-txt{ flex:1; font-size:13.5px; min-width:0; overflow-wrap:break-word; }
+  .mg-row.done .mg-txt{ color:var(--faint); text-decoration:line-through; }
+  .mg-add{ display:flex; gap:8px; margin-top:12px; }
+  .mg-add input{ flex:1; font-size:13px; }
   .j-edit{ min-height:96px; margin-bottom:8px; font-size:13px; }
   .j-label .ghost{ margin-left:auto; font-size:11px; }
   .j-label .saved{
@@ -1140,6 +1155,7 @@
         <button data-jtab="day" class="active">Daily</button>
         <button data-jtab="week">Weekly review</button>
         <button data-jtab="month">Monthly review</button>
+        <button data-jtab="goals">Monthly goals</button>
       </div>
       <div class="j-intro" id="j-intro" hidden></div>
       <div id="journal-list"></div>
@@ -1169,13 +1185,14 @@
   const jGuard = () => { // weekly / monthly review stores
     if (!db.reviews || typeof db.reviews !== 'object' || Array.isArray(db.reviews)) db.reviews = {};
     ['week', 'month'].forEach(k => { if (!db.reviews[k] || typeof db.reviews[k] !== 'object' || Array.isArray(db.reviews[k])) db.reviews[k] = {}; });
+    if (!db.monthGoals || typeof db.monthGoals !== 'object' || Array.isArray(db.monthGoals)) db.monthGoals = {};
   };
 
   const VOW_DEFAULTS = () => ([
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} } };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {} };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -2066,7 +2083,10 @@
              intro: 'Sit down once a week. Ten minutes. What moved, what stalled, what deserves next week.' },
     month: { get: () => db.reviews.month, empty: M_EMPTY, sections: ['month'], now: monthKey, limit: 24,
              tag: 'First of the month · the long view',
-             intro: 'Zoom out. A month is long enough to see patterns and short enough to change them.' }
+             intro: 'Zoom out. A month is long enough to see patterns and short enough to change them.' },
+    goals: { get: () => db.monthGoals, sections: [], now: monthKey, limit: 24,
+             tag: 'Set them early · hunt them all month',
+             intro: 'Three to five real goals. If everything matters, nothing does.' }
   };
   let jTab = 'day';
   const jAny = (e, sec) => !!e && sec.qs.some(q => (q.n > 1 ? (e[q.key] || []) : [e[q.key]]).some(x => (x || '').trim()));
@@ -2184,9 +2204,63 @@
   }
   function jCount() {
     if (jTab === 'day') { $('j-streak').textContent = jStreak() + '-day streak'; return; }
+    if (jTab === 'goals') {
+      const g = db.monthGoals[monthKey()] || [];
+      $('j-streak').textContent = g.length
+        ? g.filter(x => x.done).length + '/' + g.length + ' this month'
+        : 'no goals set yet';
+      return;
+    }
     const st = J_STORES[jTab], sec = J_SECTIONS[st.sections[0]];
     const n = Object.values(st.get()).filter(e => jAny(e, sec)).length;
     $('j-streak').textContent = n + (jTab === 'week' ? ' week' : ' month') + (n === 1 ? '' : 's') + ' reviewed';
+  }
+  function jGoalsCard(k, isNow) {
+    const goals = db.monthGoals[k] || [];
+    const done = goals.filter(g => g.done).length;
+    const card = document.createElement('div');
+    card.className = 'j-day' + (isNow ? ' today' : '');
+    card.innerHTML = '<div class="j-date">' + jPeriodLabel(k, 'month', isNow) +
+      '<span class="j-meta">' + (goals.length ? done + '/' + goals.length + ' done' : 'nothing set') + '</span></div>';
+    goals.forEach(g => {
+      const row = document.createElement('div');
+      row.className = 'mg-row' + (g.done ? ' done' : '');
+      row.innerHTML =
+        '<button class="mg-check" aria-label="Toggle goal">' + (g.done ? '✓' : '') + '</button>' +
+        '<span class="mg-txt">' + esc(g.text) + '</span>' +
+        '<button class="ghost" aria-label="Delete goal">✕</button>';
+      row.querySelector('.mg-check').onclick = () => { g.done = !g.done; save(); renderJournal(); };
+      row.querySelector('.ghost').onclick = () => {
+        db.monthGoals[k] = (db.monthGoals[k] || []).filter(x => x.id !== g.id);
+        if (!db.monthGoals[k].length && !isNow) delete db.monthGoals[k];
+        save(); renderJournal();
+      };
+      card.appendChild(row);
+    });
+    if (!goals.length && !isNow) card.insertAdjacentHTML('beforeend', '<div class="j-text dim">—</div>');
+    if (goals.length) {
+      card.insertAdjacentHTML('beforeend',
+        '<div class="dream-bar"><i style="width:' + Math.round(done / goals.length * 100) + '%"></i></div>');
+    }
+    if (isNow) {
+      const add = document.createElement('div');
+      add.className = 'mg-add';
+      const nice = new Date(k + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long' });
+      add.innerHTML = '<input placeholder="A goal for ' + nice + '…" aria-label="New monthly goal"><button class="primary">Add</button>';
+      const inp = add.querySelector('input');
+      const doAdd = () => {
+        const t = inp.value.trim();
+        if (!t) return;
+        if (!db.monthGoals[k]) db.monthGoals[k] = [];
+        db.monthGoals[k].push({ id: uid(), text: t, done: false });
+        save(); renderJournal();
+        $('journal-list').querySelector('.mg-add input').focus();
+      };
+      add.querySelector('button').onclick = doAdd;
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+      card.appendChild(add);
+    }
+    return card;
   }
   function renderJournal() {
     jMigrate(); jGuard();
@@ -2203,6 +2277,7 @@
       .sort().reverse();
     keys.slice(0, st.limit).forEach(k => {
       const isNow = k === now;
+      if (jTab === 'goals') { box.appendChild(jGoalsCard(k, isNow)); return; }
       const card = document.createElement('div');
       card.className = 'j-day' + (isNow ? ' today' : '');
       const head = document.createElement('div');
@@ -2569,7 +2644,7 @@
     if (f.truncated) text = await (await fetch(f.raw_url)).text();
     const data = JSON.parse(text);
     if (!data || !Array.isArray(data.tasks)) throw new Error('Cloud copy is not a Sanctum vault.');
-    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, ui: { vowsOpen: true } }, data);
+    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {}, ui: { vowsOpen: true } }, data);
     if (!db.ui) db.ui = { vowsOpen: true };
     save(); renderAll(); applyVowsFold();
     sync.last = 'pulled ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -2663,7 +2738,7 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} } }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {} }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
