@@ -643,7 +643,10 @@
     font-family:var(--mono); font-size:10.5px; color:var(--faint);
   }
   .vc.done{ background:var(--red-dim); border-color:var(--red-dim); color:#fff; }
+  .vc.free{ border-color:rgba(200,162,75,.45); color:var(--gold); }
+  .vc.done.free{ background:rgba(200,162,75,.16); border-color:rgba(200,162,75,.45); color:var(--gold); }
   .vc.today{ border-color:var(--gold); color:var(--gold); font-weight:500; }
+  .vstat.lic{ color:var(--gold); letter-spacing:.12em; }
   @keyframes vow-pulse{ 50%{ box-shadow:0 0 10px rgba(200,162,75,.3); } }
   .vc.today{ animation:vow-pulse 2.4s ease-in-out infinite; }
   .vow-foot{ display:flex; align-items:center; gap:16px; margin-top:12px; }
@@ -1190,7 +1193,7 @@
 
   const VOW_DEFAULTS = () => ([
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
-    { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0 }
+    { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0, freeDay: 6 }
   ]);
   let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {} };
   try {
@@ -1208,6 +1211,7 @@
   if (!db.journal || typeof db.journal !== 'object' || Array.isArray(db.journal)) db.journal = {};
   jGuard();
   if (!db.ui) db.ui = { vowsOpen: true };
+  db.vows.forEach(v => { if (v.key === 'nosmoke' && v.freeDay === undefined) v.freeDay = 6; });
   if (db.vow) { // migrate the old single vow into No Fap
     if (db.vow.start) Object.assign(db.vows[0], { start: db.vow.start, best: db.vow.best, falls: db.vow.falls });
     delete db.vow;
@@ -1654,12 +1658,21 @@
       const days = daysSince(v.start);      // full days survived
       const dayNum = Math.min(days + 1, 21); // the day you are on now
       const kept = days >= 21;
+      const free = (v.freeDay === undefined || v.freeDay === null) ? null : v.freeDay;
+      const isFree = i => { // does grid day i land on the licensed weekday?
+        if (free === null) return false;
+        const d = new Date(v.start + 'T00:00:00');
+        d.setDate(d.getDate() + i - 1);
+        return d.getDay() === free;
+      };
+      const freeToday = free !== null && new Date().getDay() === free;
 
       let cells = '';
       for (let i = 1; i <= 21; i++) {
-        if (i <= days)            cells += '<div class="vc done">✓</div>';
-        else if (i === days + 1)  cells += '<div class="vc today">' + i + '</div>';
-        else                      cells += '<div class="vc">' + i + '</div>';
+        const f = isFree(i) ? ' free' : '';
+        if (i <= days)            cells += '<div class="vc done' + f + '" title="' + (f ? 'Licensed day' : '') + '">' + (f ? 'S' : '✓') + '</div>';
+        else if (i === days + 1)  cells += '<div class="vc today' + f + '">' + i + '</div>';
+        else                      cells += '<div class="vc' + f + '"' + (f ? ' title="Licensed day"' : '') + '>' + (f ? 'S' : i) + '</div>';
       }
 
       card.innerHTML =
@@ -1670,12 +1683,14 @@
         '<div class="vow-info">' +
           (kept
             ? '21 days complete — still counting since ' + shortDate(v.start) + '.'
-            : 'Started ' + shortDate(v.start) + ' · ' + (21 - days) + ' days to go · ✓ = day survived, gold = today. Counts by itself — touch nothing unless you relapse.') +
+            : 'Started ' + shortDate(v.start) + ' · ' + (21 - days) + ' days to go · ✓ = day survived, gold = today. Counts by itself — touch nothing unless you relapse.' +
+              (free !== null ? ' S = Saturday, your licensed day — one smoke there doesn\u2019t break the vow. The other six are sacred.' : '')) +
         '</div>' +
         '<div class="vow-cells">' + cells + '</div>' +
         '<div class="vow-foot">' +
           '<span class="vstat">BEST <b>' + Math.max(v.best, days) + 'd</b></span>' +
           '<span class="vstat">RELAPSES <b>' + v.falls + '</b></span>' +
+          (freeToday && !kept ? '<span class="vstat lic">LICENSED TODAY \u2014 IF YOU MUST</span>' : '') +
           (kept ? '<button class="vbtn renew" style="margin-left:auto">Renew · 21 more</button>' : '') +
           '<button class="vbtn fall"' + (kept ? '' : ' style="margin-left:auto"') + '>Relapsed · restart</button>' +
         '</div>';
