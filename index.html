@@ -309,6 +309,31 @@
     height:4px; background:var(--bg-deep); border:1px solid var(--line-soft);
     border-radius:2px; overflow:hidden;
   }
+  .pomo-days{
+    display:flex; gap:7px; align-items:flex-end;
+    margin-top:16px; padding-top:12px; border-top:1px solid var(--line-soft);
+  }
+  .pomo-days .pd{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .pomo-days .pd b{
+    font-family:var(--mono); font-size:7.5px; font-weight:400;
+    color:var(--muted); letter-spacing:.02em; white-space:nowrap;
+  }
+  .pomo-days .pd .bar{
+    width:100%; max-width:22px; height:34px; display:flex; align-items:flex-end;
+    background:var(--bg-deep); border:1px solid var(--line-soft); border-radius:2px;
+    overflow:hidden;
+  }
+  .pomo-days .pd .bar i{
+    display:block; width:100%;
+    background:linear-gradient(180deg,var(--gold),rgba(200,162,75,.45));
+  }
+  .pomo-days .pd span{
+    font-family:var(--mono); font-size:8px; color:var(--faint); letter-spacing:.05em;
+  }
+  .pomo-days .pd.today span{ color:var(--gold); }
+  .pomo-days .pd.today .bar{ border-color:rgba(200,162,75,.45); }
   .pomo-bar i{
     display:block; height:100%; width:0;
     background:linear-gradient(90deg,var(--red-dim),var(--red));
@@ -1006,6 +1031,7 @@
             <button class="primary" id="pomo-start" style="flex:1">Start</button>
             <button id="pomo-stop">Stop</button>
           </div>
+          <div class="pomo-days" id="pomo-days" title="Deep work, last 7 days"></div>
         </div>
       </section>
 
@@ -1247,9 +1273,27 @@
   function renderStats() {
     $('stat-open').textContent = db.tasks.filter(t => !t.done).length;
     $('stat-done').textContent = db.tasks.filter(t => t.done && t.doneOn === todayKey()).length;
+    const fmtH = m => !m ? '0m'
+      : m < 60 ? m + 'm'
+      : Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '');
     const focusMins = db.pomo.filter(p => p.date === todayKey()).reduce((s, p) => s + p.mins, 0);
-    $('stat-focus').textContent = focusMins + 'm';
-    $('pomo-today').textContent = focusMins + 'm today';
+    $('stat-focus').textContent = fmtH(focusMins);
+    $('pomo-today').textContent = fmtH(focusMins) + ' today';
+
+    // deep work per day, last 7 days
+    const byDay = {};
+    db.pomo.forEach(p => { byDay[p.date] = (byDay[p.date] || 0) + p.mins; });
+    const days = last7().map(d => {
+      const k = todayKey(d);
+      return { k, mins: byDay[k] || 0, letter: 'SMTWTFS'[d.getDay()], today: k === todayKey() };
+    });
+    const peak = Math.max(120, ...days.map(d => d.mins)); // 2h floor so light days stay honest
+    $('pomo-days').innerHTML = days.map(d =>
+      '<div class="pd' + (d.today ? ' today' : '') + '" title="' + shortDate(d.k) + ' — ' + fmtH(d.mins) + '">' +
+        '<b>' + (d.mins ? fmtH(d.mins) : '·') + '</b>' +
+        '<div class="bar"><i style="height:' + Math.round(d.mins / peak * 100) + '%"></i></div>' +
+        '<span>' + d.letter + '</span>' +
+      '</div>').join('');
     let best = 0;
     db.habits.forEach(h => { best = Math.max(best, streakOf(h)); });
     $('stat-streak').innerHTML = best + '<em>d</em>';
