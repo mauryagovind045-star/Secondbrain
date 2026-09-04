@@ -733,6 +733,11 @@
   .dream-body{ padding:12px 14px 14px; }
   .dream-body .dt{ font-family:var(--heads); font-weight:500; font-size:15.5px; letter-spacing:.06em; }
   .dream-chips{ display:flex; gap:5px; margin-top:8px; flex-wrap:wrap; }
+  .dream-chips .chip.lnk{
+    color:var(--gold); border-color:rgba(200,162,75,.4); cursor:pointer;
+    max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .dream-chips .chip.lnk:hover{ border-color:var(--gold); }
   .chip.vital{ color:var(--red); border-color:rgba(212,53,59,.4); }
   .chip.high{ color:var(--gold); border-color:rgba(200,162,75,.4); }
   .chip.achieved{ color:var(--gold); border-color:rgba(200,162,75,.4); }
@@ -1963,6 +1968,8 @@
           '<div class="dream-chips">' +
             '<span class="chip ' + d.prio + '">' + DREAM_PRIO[d.prio] + '</span>' +
             '<span class="chip st ' + d.status + '" title="Click to update status">' + DREAM_STATUS[d.status] + '</span>' +
+            (d.link ? '<span class="chip lnk" title="' + esc(d.link).replace(/"/g, '&quot;') + '">↗ ' +
+              esc((() => { try { return new URL(d.link).hostname.replace(/^www\./, ''); } catch (e) { return 'link'; } })()) + '</span>' : '') +
           '</div>' +
           (pct !== null
             ? '<div class="dream-bar"><i style="width:' + pct + '%"></i></div>' +
@@ -1975,6 +1982,11 @@
         e.stopPropagation();
         d.status = NEXT_STATUS[d.status] || 'planned';
         save(); renderDreams();
+      };
+      const lnk = card.querySelector('.chip.lnk');
+      if (lnk) lnk.onclick = e => {
+        e.stopPropagation();
+        window.open(d.link, '_blank', 'noopener');
       };
       grid.appendChild(card);
     });
@@ -2026,6 +2038,8 @@
           '<select id="dm-status" style="width:100%">' +
             Object.entries(DREAM_STATUS).map(([v, l]) => '<option value="' + v + '"' + (d && d.status === v ? ' selected' : '') + '>' + l.toUpperCase() + '</option>').join('') +
           '</select>' +
+          '<label class="f-label">Link</label>' +
+          '<input id="dm-link" placeholder="Product page, listing, video…" value="' + (d && d.link ? esc(d.link).replace(/"/g, '&quot;') : '') + '">' +
           '<label class="f-label">Notes</label>' +
           '<textarea id="dm-notes" placeholder="Why this matters, model, plan…">' + (d && d.notes ? esc(d.notes) : '') + '</textarea>' +
           '<div class="modal-actions">' +
@@ -2072,6 +2086,13 @@
         prio: scrim.querySelector('#dm-prio').value,
         status: scrim.querySelector('#dm-status').value
       };
+      let link = scrim.querySelector('#dm-link').value.trim();
+      if (link) {
+        if (!/^[a-z][a-z0-9+.-]*:/i.test(link)) link = 'https://' + link;
+        try { const u = new URL(link); if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) throw 0; link = u.href; }
+        catch (e) { scrim.querySelector('#dm-msg').textContent = 'LINK LOOKS BROKEN — FIX OR CLEAR IT'; return; }
+      }
+      rec.link = link || null;
       rec.notes = scrim.querySelector('#dm-notes').value.trim();
       if (d) Object.assign(d, rec); else db.dreams.unshift(rec);
       if (!save()) {
