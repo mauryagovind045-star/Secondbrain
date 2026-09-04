@@ -753,6 +753,66 @@
   }
   .dream-meta b{ color:var(--muted); font-weight:500; }
 
+  /* ---------- the day (time blocking) ---------- */
+  .cal-wrap{ max-width:860px; margin:0 auto; }
+  .cal-nav{ display:flex; align-items:center; gap:8px; margin:14px 0 6px; }
+  .cal-nav button{
+    font-family:var(--mono); font-size:11px; padding:6px 12px;
+    border-radius:2px; color:var(--muted);
+  }
+  .cal-nav button:hover{ color:var(--text); border-color:var(--faint); }
+  .cal-date{
+    font-family:var(--heads); font-weight:600; font-size:16px;
+    letter-spacing:.08em; margin-left:8px;
+  }
+  .cal-date em{ font-style:normal; color:var(--red); }
+  .cal-hint{
+    font-family:var(--mono); font-size:8.5px; color:var(--faint);
+    letter-spacing:.08em; text-transform:uppercase; margin-bottom:10px;
+  }
+  .cal-body{
+    display:flex; background:var(--panel); border:1px solid var(--line-soft);
+    border-radius:var(--radius); padding:14px 8px 14px 0;
+  }
+  .cal-gutter{ width:56px; position:relative; flex:none; }
+  .cal-gutter span{
+    position:absolute; right:10px; transform:translateY(-50%);
+    font-family:var(--mono); font-size:8.5px; color:var(--faint);
+  }
+  .cal-canvas{
+    flex:1; position:relative; touch-action:none;
+    border-left:1px solid var(--line-soft);
+  }
+  .cal-hour{ position:absolute; left:0; right:0; height:1px; background:var(--line-soft); }
+  .cal-block{
+    position:absolute; border-radius:3px; padding:3px 8px;
+    overflow:hidden; cursor:grab; user-select:none;
+    border:1px solid; border-left-width:3px;
+  }
+  .cal-block b{ font-weight:500; display:block; font-size:12px; line-height:1.3; }
+  .cal-block .bt{
+    font-family:var(--mono); font-size:8px; opacity:.75; letter-spacing:.05em;
+  }
+  .cal-block .rs{ position:absolute; left:0; right:0; bottom:0; height:8px; cursor:ns-resize; }
+  .cal-block.drag{ opacity:.85; cursor:grabbing; z-index:10; }
+  .cal-block.deep{ background:rgba(200,162,75,.15); border-color:rgba(200,162,75,.5); color:var(--gold); }
+  .cal-block.work{ background:rgba(212,53,59,.13); border-color:rgba(212,53,59,.55); color:#e28589; }
+  .cal-block.personal{ background:rgba(125,162,193,.13); border-color:rgba(125,162,193,.5); color:#8fb0cb; }
+  .cal-block.health{ background:rgba(79,143,95,.15); border-color:rgba(79,143,95,.55); color:#7dba8f; }
+  .cal-block.misc{ background:rgba(255,255,255,.05); border-color:var(--line); color:var(--muted); }
+  .cal-ghost{
+    position:absolute; background:rgba(200,162,75,.1);
+    border:1px dashed rgba(200,162,75,.5); border-radius:3px; pointer-events:none;
+  }
+  .cal-now{
+    position:absolute; left:0; right:0; height:2px; background:var(--red);
+    z-index:5; pointer-events:none;
+  }
+  .cal-now::before{
+    content:''; position:absolute; left:-4px; top:-3px;
+    width:8px; height:8px; border-radius:50%; background:var(--red);
+  }
+
   /* ---------- dream modal ---------- */
   .scrim{
     position:fixed; inset:0; z-index:100;
@@ -906,6 +966,7 @@
   <nav class="views" aria-label="Pages">
     <button class="view-btn active" data-view="dash">Command</button>
     <button class="view-btn" data-view="tasks">Missions</button>
+    <button class="view-btn" data-view="cal">Calendar</button>
     <button class="view-btn" data-view="dreams">Dreams</button>
     <button class="view-btn" data-view="ledger">Ledger</button>
     <button class="view-btn" data-view="library">Library</button>
@@ -1089,6 +1150,27 @@
     </div>
   </div>
 
+  <div id="view-cal" hidden>
+    <div class="cal-wrap">
+      <div class="dreams-head">
+        <h2>The Day</h2><span class="tag">Time blocking · own the hours</span>
+        <span class="count" id="cal-total" style="margin-left:auto"></span>
+      </div>
+      <div class="cal-nav">
+        <button id="cal-prev" aria-label="Previous day">‹</button>
+        <button id="cal-today">Today</button>
+        <button id="cal-next" aria-label="Next day">›</button>
+        <span class="cal-date" id="cal-date"></span>
+        <input type="date" id="cal-pick" style="margin-left:auto;max-width:150px" aria-label="Jump to date">
+      </div>
+      <div class="cal-hint">Drag on empty space to carve a block · drag a block to move · drag its bottom edge to resize · click to edit</div>
+      <div class="cal-body">
+        <div class="cal-gutter" id="cal-gutter"></div>
+        <div class="cal-canvas" id="cal-canvas"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="view-dreams" hidden>
     <div class="dreams-head">
       <h2>Dreams</h2><span class="tag">What the war chest is for — goals, wants, acquisitions</span>
@@ -1226,7 +1308,7 @@
     { key: 'nofap',   name: 'No Fap',     start: null, best: 0, falls: 0 },
     { key: 'nosmoke', name: 'No Smoking', start: null, best: 0, falls: 0, freeDay: 6 }
   ]);
-  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {} };
+  let db = { tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], ui: { vowsOpen: true }, pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {}, blocks: {} };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) db = Object.assign(db, JSON.parse(raw));
@@ -1937,12 +2019,225 @@
   /* ---------- view switching ---------- */
   function showView(name) {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-    ['dash', 'tasks', 'dreams', 'ledger', 'library', 'journal', 'note'].forEach(v => { $('view-' + v).hidden = v !== name; });
+    ['dash', 'tasks', 'cal', 'dreams', 'ledger', 'library', 'journal', 'note'].forEach(v => { $('view-' + v).hidden = v !== name; });
     window.scrollTo(0, 0);
   }
   document.querySelectorAll('.view-btn').forEach(btn => {
     btn.onclick = () => showView(btn.dataset.view);
   });
+
+  /* ---------- the day (time blocking) ---------- */
+  const CAL_START = 5 * 60, CAL_END = 24 * 60, CAL_PPM = 56 / 60, CAL_SNAP = 15;
+  const CAL_CATS = { deep: 'Deep work', work: 'Work', personal: 'Personal', health: 'Health', misc: 'Misc' };
+  let calDate = todayKey();
+  const calGuard = () => { if (!db.blocks || typeof db.blocks !== 'object' || Array.isArray(db.blocks)) db.blocks = {}; };
+  const calY = m => (m - CAL_START) * CAL_PPM;
+  const calM = y => Math.round((y / CAL_PPM + CAL_START) / CAL_SNAP) * CAL_SNAP;
+  const m2t = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  const t2m = t => { const p = t.split(':'); return (+p[0]) * 60 + (+p[1] || 0); };
+  const calFmt = m => {
+    if (m >= 1440) return '12am';
+    const h = Math.floor(m / 60), mm = m % 60;
+    return (((h + 11) % 12) + 1) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h >= 12 ? 'pm' : 'am');
+  };
+  const calHM = m => m < 60 ? m + 'm' : Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '');
+
+  function renderCal() {
+    calGuard();
+    const isToday = calDate === todayKey();
+    const nice = new Date(calDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('cal-date').innerHTML = (isToday ? '<em>Today</em> · ' : '') + nice;
+    $('cal-pick').value = calDate;
+    const blocks = (db.blocks[calDate] || []).slice().sort((a, b) => a.start - b.start || b.end - a.end);
+    const mins = blocks.reduce((t, b) => t + (b.end - b.start), 0);
+    $('cal-total').textContent = mins ? calHM(mins) + ' planned' : 'nothing planned';
+
+    const H = (CAL_END - CAL_START) * CAL_PPM;
+    const g = $('cal-gutter'); g.innerHTML = ''; g.style.height = H + 'px';
+    const c = $('cal-canvas'); c.innerHTML = ''; c.style.height = H + 'px';
+    for (let m = CAL_START; m <= CAL_END; m += 60) {
+      if (m > CAL_START && m < CAL_END) {
+        const line = document.createElement('div');
+        line.className = 'cal-hour'; line.style.top = calY(m) + 'px';
+        c.appendChild(line);
+      }
+      const lab = document.createElement('span');
+      lab.style.top = calY(m) + 'px'; lab.textContent = calFmt(m);
+      g.appendChild(lab);
+    }
+    // overlap packing: greedy columns, width shared within overlap group
+    const cols = [];
+    blocks.forEach(b => {
+      for (let i = 0; ; i++) {
+        if (cols[i] === undefined || cols[i] <= b.start) { cols[i] = b.end; b._col = i; break; }
+      }
+    });
+    blocks.forEach(b => {
+      b._n = Math.max.apply(null, blocks.filter(x => x.start < b.end && x.end > b.start).map(x => x._col)) + 1;
+    });
+    blocks.forEach(b => {
+      const el = document.createElement('div');
+      el.className = 'cal-block ' + (CAL_CATS[b.cat] ? b.cat : 'work');
+      el.style.top = calY(b.start) + 'px';
+      el.style.height = Math.max(18, (b.end - b.start) * CAL_PPM - 2) + 'px';
+      const w = 100 / b._n;
+      el.style.left = 'calc(' + (b._col * w) + '% + 3px)';
+      el.style.width = 'calc(' + w + '% - 8px)';
+      el.innerHTML = '<b>' + esc(b.title) + '</b><span class="bt">' + calFmt(b.start) + ' – ' + calFmt(b.end) + '</span><span class="rs"></span>';
+      el.dataset.id = b.id;
+      c.appendChild(el);
+    });
+    if (isToday) {
+      const now = new Date(), nm = now.getHours() * 60 + now.getMinutes();
+      if (nm >= CAL_START && nm <= CAL_END) {
+        const l = document.createElement('div');
+        l.className = 'cal-now'; l.style.top = calY(nm) + 'px';
+        c.appendChild(l);
+      }
+    }
+  }
+
+  function calModal(b) {
+    const isNew = !b.id;
+    const scrim = document.createElement('div');
+    scrim.className = 'scrim';
+    scrim.innerHTML =
+      '<div class="modal" style="width:min(420px,100%)"><div class="modal-body">' +
+        '<label class="f-label">What are you doing</label>' +
+        '<input id="cb-title" placeholder="Deep work, gym, site visits…" value="' + (b.title ? esc(b.title).replace(/"/g, '&quot;') : '') + '">' +
+        '<div class="f-grid">' +
+          '<div><label class="f-label">From</label><input id="cb-start" type="time" step="900" value="' + m2t(b.start) + '"></div>' +
+          '<div><label class="f-label">To</label><input id="cb-end" type="time" step="900" value="' + m2t(Math.min(b.end, 1439)) + '"></div>' +
+        '</div>' +
+        '<label class="f-label">Type</label>' +
+        '<select id="cb-cat" style="width:100%">' +
+          Object.entries(CAL_CATS).map(([v, l]) => '<option value="' + v + '"' + (b.cat === v ? ' selected' : '') + '>' + l.toUpperCase() + '</option>').join('') +
+        '</select>' +
+        '<div class="modal-actions">' +
+          '<button class="primary" id="cb-save">' + (isNew ? 'Block it' : 'Save') + '</button>' +
+          (isNew ? '' : '<button id="cb-del">Delete</button>') +
+          '<span class="msg" id="cb-msg"></span><span class="grow"></span>' +
+          '<button id="cb-close">Close</button>' +
+        '</div>' +
+      '</div></div>';
+    document.body.appendChild(scrim);
+    const close = () => scrim.remove();
+    scrim.querySelector('#cb-close').onclick = close;
+    scrim.addEventListener('click', e => { if (e.target === scrim) close(); });
+    document.addEventListener('keydown', function esc2(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc2); }
+    });
+    scrim.querySelector('#cb-save').onclick = () => {
+      const title = scrim.querySelector('#cb-title').value.trim();
+      if (!title) { scrim.querySelector('#cb-msg').textContent = 'NAME THE BLOCK'; return; }
+      let start = t2m(scrim.querySelector('#cb-start').value || '09:00');
+      let end = t2m(scrim.querySelector('#cb-end').value || '10:00');
+      if (end === 0) end = 1440;
+      if (end <= start) { scrim.querySelector('#cb-msg').textContent = 'ENDS BEFORE IT STARTS'; return; }
+      start = Math.max(CAL_START, start); end = Math.min(CAL_END, end);
+      calGuard();
+      if (!db.blocks[calDate]) db.blocks[calDate] = [];
+      if (isNew) db.blocks[calDate].push({ id: uid(), title, start, end, cat: scrim.querySelector('#cb-cat').value });
+      else Object.assign(b, { title, start, end, cat: scrim.querySelector('#cb-cat').value });
+      save(); renderCal(); close();
+    };
+    const del = scrim.querySelector('#cb-del');
+    if (del) del.onclick = () => {
+      db.blocks[calDate] = db.blocks[calDate].filter(x => x.id !== b.id);
+      save(); renderCal(); close();
+    };
+    const ti = scrim.querySelector('#cb-title');
+    ti.focus();
+    ti.addEventListener('keydown', e => { if (e.key === 'Enter') scrim.querySelector('#cb-save').click(); });
+  }
+
+  let calDrag = null;
+  const calvas = $('cal-canvas');
+  calvas.addEventListener('pointerdown', e => {
+    if (e.button !== undefined && e.button !== 0) return;
+    const rect = calvas.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const blockEl = e.target.closest('.cal-block');
+    if (blockEl) {
+      const b = (db.blocks[calDate] || []).find(x => x.id === blockEl.dataset.id);
+      if (!b) return;
+      calDrag = {
+        mode: e.target.classList.contains('rs') ? 'resize' : 'move',
+        b, el: blockEl, startY: y,
+        orig: { start: b.start, end: b.end }, moved: false
+      };
+    } else {
+      const m = Math.max(CAL_START, Math.min(CAL_END - CAL_SNAP, calM(y)));
+      calDrag = { mode: 'create', startM: m, moved: false, ghost: null, curA: m, curB: m + CAL_SNAP };
+    }
+    try { calvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+  });
+  calvas.addEventListener('pointermove', e => {
+    const d = calDrag; if (!d) return;
+    const rect = calvas.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    if (d.mode === 'create') {
+      if (Math.abs(y - calY(d.startM)) > 6) d.moved = true;
+      if (!d.moved) return;
+      if (!d.ghost) {
+        d.ghost = document.createElement('div');
+        d.ghost.className = 'cal-ghost';
+        d.ghost.style.left = '3px'; d.ghost.style.right = '3px';
+        calvas.appendChild(d.ghost);
+      }
+      const m = Math.max(CAL_START, Math.min(CAL_END, calM(y)));
+      d.curA = Math.min(d.startM, m);
+      d.curB = Math.max(d.startM + CAL_SNAP, m);
+      d.ghost.style.top = calY(d.curA) + 'px';
+      d.ghost.style.height = ((d.curB - d.curA) * CAL_PPM) + 'px';
+      return;
+    }
+    const dy = y - d.startY;
+    if (Math.abs(dy) > 4) d.moved = true;
+    if (!d.moved) return;
+    const dm = Math.round(dy / CAL_PPM / CAL_SNAP) * CAL_SNAP;
+    if (d.mode === 'move') {
+      const len = d.orig.end - d.orig.start;
+      const ns = Math.max(CAL_START, Math.min(CAL_END - len, d.orig.start + dm));
+      d.b.start = ns; d.b.end = ns + len;
+    } else {
+      d.b.end = Math.max(d.b.start + CAL_SNAP, Math.min(CAL_END, d.orig.end + dm));
+    }
+    d.el.classList.add('drag');
+    d.el.style.top = calY(d.b.start) + 'px';
+    d.el.style.height = Math.max(18, (d.b.end - d.b.start) * CAL_PPM - 2) + 'px';
+    d.el.querySelector('.bt').textContent = calFmt(d.b.start) + ' – ' + calFmt(d.b.end);
+  });
+  calvas.addEventListener('pointerup', () => {
+    const d = calDrag; calDrag = null;
+    if (!d) return;
+    if (d.mode === 'create') {
+      if (d.ghost) d.ghost.remove();
+      if (d.moved) calModal({ start: d.curA, end: d.curB, cat: 'deep' });
+      else {
+        const m = Math.max(CAL_START, Math.min(CAL_END - 60, d.startM));
+        calModal({ start: m, end: Math.min(m + 60, CAL_END), cat: 'deep' });
+      }
+      return;
+    }
+    if (d.moved) { save(); renderCal(); }
+    else calModal(d.b);
+  });
+  calvas.addEventListener('pointercancel', () => {
+    const d = calDrag; calDrag = null;
+    if (!d) return;
+    if (d.ghost) d.ghost.remove();
+    if (d.orig) { d.b.start = d.orig.start; d.b.end = d.orig.end; renderCal(); }
+  });
+  const calShift = n => {
+    const x = new Date(calDate + 'T00:00:00');
+    x.setDate(x.getDate() + n);
+    calDate = todayKey(x); renderCal();
+  };
+  $('cal-prev').onclick = () => calShift(-1);
+  $('cal-next').onclick = () => calShift(1);
+  $('cal-today').onclick = () => { calDate = todayKey(); renderCal(); };
+  $('cal-pick').onchange = e => { if (e.target.value) { calDate = e.target.value; renderCal(); } };
 
   /* ---------- dreams (vision board) ---------- */
   const DREAM_STATUS = { planned: 'Planned', underway: 'Underway', achieved: 'Achieved' };
@@ -2724,7 +3019,7 @@
     if (f.truncated) text = await (await fetch(f.raw_url)).text();
     const data = JSON.parse(text);
     if (!data || !Array.isArray(data.tasks)) throw new Error('Cloud copy is not a Sanctum vault.');
-    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {}, ui: { vowsOpen: true } }, data);
+    db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {}, blocks: {}, ui: { vowsOpen: true } }, data);
     if (!db.ui) db.ui = { vowsOpen: true };
     save(); renderAll(); applyVowsFold();
     sync.last = 'pulled ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -2818,7 +3113,7 @@
     r.onload = () => {
       try {
         const data = JSON.parse(r.result);
-        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {} }, data);
+        db = Object.assign({ tasks: [], people: [], notes: [], habits: [], goals: [], vows: VOW_DEFAULTS(), year: { target: 5000000, earned: 0 }, inbox: [], expenses: [], credits: [], dreams: [], pomo: [], library: [], journal: {}, reviews: { week: {}, month: {} }, monthGoals: {}, blocks: {} }, data);
         if (!Array.isArray(db.vows)) db.vows = VOW_DEFAULTS();
         if (!db.year || !db.year.target) db.year = { target: 5000000, earned: 0 };
         if (!Array.isArray(db.inbox)) db.inbox = [];
@@ -2837,7 +3132,7 @@
   };
 
   function renderAll() {
-    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderCredits(); renderDreams(); renderLibrary(); renderJournal(); renderStats();
+    renderTasks(); renderTasksPage(); renderInbox(); renderHabits(); renderGoals(); renderVow(); renderYear(); renderExpenses(); renderCredits(); renderDreams(); renderCal(); renderLibrary(); renderJournal(); renderStats();
   }
   renderAll();
 })();
